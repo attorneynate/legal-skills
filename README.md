@@ -6,6 +6,8 @@ Agent Skills is an open standard for giving AI agents new abilities: a skill is 
 
 These are research aids, not legal advice. Verify anything you rely on against the official source.
 
+**Before you start:** `federal-law` needs Python 3.9 or later and a free GovInfo API key. Sign up at [govinfo.gov/api-signup](https://www.govinfo.gov/api-signup) (it takes a minute), then save the key as its [setup section](plugins/federal-law/skills/federal-law/README.md#setup) shows.
+
 ## Skills
 
 | Skill | What it does |
@@ -16,9 +18,9 @@ These are research aids, not legal advice. Verify anything you rely on against t
 
 ### Any agent that supports Agent Skills
 
-1. Download the skill's ZIP file from the [latest release](https://github.com/attorneynate/legal-skills/releases) (for example `federal-law-1.0.2.zip`), or copy the skill's folder from this repository (`plugins/federal-law/skills/federal-law/`).
+1. Download the skill's ZIP file from the [latest release](https://github.com/attorneynate/legal-skills/releases) (`federal-law-<version>.zip`), or copy the skill's folder from this repository (`plugins/federal-law/skills/federal-law/`).
 2. Put the `federal-law` folder in your agent's skills folder. Where that is depends on the agent; each one's instructions are linked from [agentskills.io/clients](https://agentskills.io/clients).
-3. Complete the skill's setup (below).
+3. Get your free GovInfo API key at [govinfo.gov/api-signup](https://www.govinfo.gov/api-signup) and save it as the skill's [setup section](plugins/federal-law/skills/federal-law/README.md#setup) shows.
 
 ### Claude Code (one step, with updates)
 
@@ -34,11 +36,11 @@ claude plugin marketplace add attorneynate/legal-skills
 claude plugin install federal-law@legal-skills
 ```
 
-To get later releases: `/plugin marketplace update legal-skills`. (The `plugins/` folders are Claude Code's packaging; the skill itself is the `skills/<name>/` folder inside each one.)
+Then get your free GovInfo API key at [govinfo.gov/api-signup](https://www.govinfo.gov/api-signup) and save it as the skill's [setup section](plugins/federal-law/skills/federal-law/README.md#setup) shows. To get later releases: `/plugin marketplace update legal-skills`. (The `plugins/` folders are Claude Code's packaging; the skill itself is the `skills/<name>/` folder inside each one.)
 
 ### Setup each skill needs
 
-Each skill's README lists its own requirements. `federal-law` needs Python 3.9 or later and a free GovInfo API key; see [its setup section](plugins/federal-law/skills/federal-law/README.md#setup).
+Each skill's README lists its own requirements. `federal-law` needs Python 3.9 or later and a free GovInfo API key ([sign up](https://www.govinfo.gov/api-signup); see [its setup section](plugins/federal-law/skills/federal-law/README.md#setup) for saving it). The other sources it uses need no key.
 
 These skills run scripts that call government websites, so they need an agent that can run Python with open network access. Hosted environments that restrict outbound network access can't run them.
 

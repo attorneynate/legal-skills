@@ -16,7 +16,7 @@ This skill answers federal statutory and regulatory questions from official sour
 
 ## Setup
 
-GovInfo requires a free api.data.gov key (sign up at https://api.data.gov/signup/). Save it in `~/.govinfo_api_key`, or set the `GOVINFO_API_KEY` environment variable; the script reads it itself. Never print, echo, or paste the key. Without a key the script falls back to `DEMO_KEY` and warns on stderr (`using DEMO_KEY`); the demo key's rate limit is too low for real research, so stop and tell the user how to set one up.
+GovInfo requires an API key (sign up at https://www.govinfo.gov/api-signup; it's a free api.data.gov key and takes a minute to get). Save it in `~/.govinfo_api_key`, or set the `GOVINFO_API_KEY` environment variable; the script reads it itself. Never print, echo, or paste the key. Without a key the script falls back to `DEMO_KEY` and warns on stderr (`using DEMO_KEY`); the demo key's rate limit is too low for real research, so stop and tell the user how to set one up.
 
 Run the script from a POSIX shell (bash or zsh; on Windows, Git Bash). Windows PowerShell 5.1 strips the double quotes inside arguments, which breaks phrase searches. The examples use `python3`; where that command doesn't exist (some Windows installs), use `python`.
 

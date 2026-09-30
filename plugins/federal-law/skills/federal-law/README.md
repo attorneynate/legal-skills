@@ -25,7 +25,7 @@ It is a research aid, not legal advice. Verify anything you rely on against the 
 ## Setup
 
 1. **Python 3.9 or later.** The script uses only the standard library; there is nothing to install.
-2. **A free GovInfo API key.** Sign up at <https://api.data.gov/signup/>, then save the key where the script looks for it:
+2. **A free GovInfo API key.** Sign up at <https://www.govinfo.gov/api-signup>; it's a free api.data.gov key and takes a minute to get. Then save it where the script looks for it:
    - macOS / Linux (the key isn't shown as you paste it):
      ```bash
      read -rs -p "GovInfo API key: " k && printf '%s' "$k" > ~/.govinfo_api_key && chmod 600 ~/.govinfo_api_key; unset k; echo
