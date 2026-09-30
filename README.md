@@ -1,6 +1,6 @@
-# legal-research-skills
+# legal-skills
 
-Claude skills for legal research from official sources. Each skill is a self-contained plugin you can install on its own.
+Claude skills for legal research and legal work. Each skill is a self-contained plugin you can install on its own.
 
 These are research aids, not legal advice. Verify anything you rely on against the official source.
 
@@ -15,18 +15,18 @@ These are research aids, not legal advice. Verify anything you rely on against t
 ### Claude Code
 
 ```
-/plugin marketplace add attorneynate/legal-research-skills
-/plugin install federal-law@legal-research-skills
+/plugin marketplace add attorneynate/legal-skills
+/plugin install federal-law@legal-skills
 ```
 
 Or from a terminal:
 
 ```bash
-claude plugin marketplace add attorneynate/legal-research-skills
-claude plugin install federal-law@legal-research-skills
+claude plugin marketplace add attorneynate/legal-skills
+claude plugin install federal-law@legal-skills
 ```
 
-To get later releases, update the marketplace: `/plugin marketplace update legal-research-skills`.
+To get later releases, update the marketplace: `/plugin marketplace update legal-skills`.
 
 ### By hand
 

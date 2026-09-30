@@ -47,7 +47,7 @@ ECFR = "https://www.ecfr.gov/api/versioner/v1"
 ECFR_SEARCH = "https://www.ecfr.gov/api/search/v1/results"
 FEDREG = "https://www.federalregister.gov/api/v1/documents.json"
 # Identifies this tool to the sites it calls, with a link to where it comes from.
-USER_AGENT = "federal-law-skill (+https://github.com/attorneynate/legal-research-skills)"
+USER_AGENT = "federal-law-skill (+https://github.com/attorneynate/legal-skills)"
 
 
 def api_key():
