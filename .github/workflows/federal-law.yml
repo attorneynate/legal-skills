@@ -1,0 +1,77 @@
+name: federal-law
+
+# Public repo: Actions minutes are free, so every change runs the full matrix.
+
+on:
+  push:
+    paths: ["plugins/federal-law/**", ".claude-plugin/**", ".github/workflows/federal-law.yml"]
+  pull_request:
+    paths: ["plugins/federal-law/**", ".claude-plugin/**", ".github/workflows/federal-law.yml"]
+  schedule:
+    - cron: "17 11 * * 1"  # Mondays: catch a source changing its format
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+    working-directory: plugins/federal-law/skills/federal-law/scripts
+
+jobs:
+  manifests:
+    # The marketplace and plugin manifests, checked by Claude Code's own validator.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate --strict .
+      - run: claude plugin validate --strict plugins/federal-law
+
+  offline:
+    # No network, no key: the script must compile and every command must parse
+    # its arguments on the oldest and newest supported Pythons.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m py_compile federal_law.py selftest.py
+      - name: every command's --help
+        run: |
+          for cmd in collections search ecfr-search fr-rules plaw history summary text granules \
+                     usc currency cfr-currency cfr; do
+            python federal_law.py "$cmd" --help > /dev/null
+          done
+
+  live:
+    # The self-test against the live sources. Needs the GOVINFO_API_KEY secret;
+    # pull requests from forks don't get secrets, so there the job skips itself.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.13"]
+    env:
+      GOVINFO_API_KEY: ${{ secrets.GOVINFO_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: self-test
+        run: |
+          if [ -z "$GOVINFO_API_KEY" ]; then
+            echo "::notice::GOVINFO_API_KEY secret not available; skipping the live self-test."
+            exit 0
+          fi
+          python selftest.py

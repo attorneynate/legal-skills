@@ -1,0 +1,30 @@
+{
+  "name": "legal-research-skills",
+  "owner": {
+    "name": "Attorney Nate",
+    "url": "https://github.com/attorneynate"
+  },
+  "description": "Claude skills for legal research from official sources.",
+  "plugins": [
+    {
+      "name": "federal-law",
+      "source": "./plugins/federal-law",
+      "description": "Find, read, and verify U.S. federal statutes and regulations from official sources: U.S. Code, CFR, Federal Register, public laws, and legislative history, with currency checks, as-of-date pulls, and pinpoint cites.",
+      "version": "1.0.0",
+      "license": "MIT",
+      "keywords": [
+        "legal research",
+        "law",
+        "U.S. Code",
+        "CFR",
+        "eCFR",
+        "Federal Register",
+        "GovInfo",
+        "legislative history",
+        "statutes",
+        "regulations"
+      ],
+      "category": "research"
+    }
+  ]
+}

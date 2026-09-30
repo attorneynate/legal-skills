@@ -1,0 +1,22 @@
+{
+  "name": "federal-law",
+  "version": "1.0.0",
+  "description": "Find, read, and verify U.S. federal statutes and regulations from official sources: U.S. Code, CFR, Federal Register, public laws, and legislative history, with currency checks, as-of-date pulls, and pinpoint cites.",
+  "author": {
+    "name": "Attorney Nate",
+    "url": "https://github.com/attorneynate"
+  },
+  "homepage": "https://github.com/attorneynate/legal-research-skills/tree/main/plugins/federal-law/skills/federal-law",
+  "repository": "https://github.com/attorneynate/legal-research-skills",
+  "license": "MIT",
+  "keywords": [
+    "legal research",
+    "law",
+    "U.S. Code",
+    "CFR",
+    "eCFR",
+    "Federal Register",
+    "GovInfo",
+    "legislative history"
+  ]
+}
