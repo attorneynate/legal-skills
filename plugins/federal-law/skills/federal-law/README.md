@@ -1,6 +1,6 @@
 # federal-law
 
-A Claude skill for researching U.S. federal statutes and regulations from official sources. Ask Claude a federal-law question in plain English, and the skill finds the provisions, reads their text, checks that they are current, and cites them.
+An [Agent Skill](https://agentskills.io) for researching U.S. federal statutes and regulations from official sources. It works in Claude and in any AI agent that supports the Agent Skills standard (ChatGPT and Codex, Gemini CLI, GitHub Copilot, Cursor, and many more). Ask your agent a federal-law question in plain English, and the skill finds the provisions, reads their text, checks that they are current, and cites them.
 
 It is a research aid, not legal advice. Verify anything you rely on against the official source, and see [What it doesn't do](#what-it-doesnt-do).
 
@@ -42,7 +42,7 @@ On macOS with Python from python.org, if every request fails with a certificate 
 
 ## Try it
 
-Ask Claude things like:
+Ask your agent things like:
 
 - "Which federal regulations define yogurt?"
 - "Pull 5 U.S.C. 552(b)(6) and check that it's current."

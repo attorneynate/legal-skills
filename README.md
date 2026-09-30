@@ -1,6 +1,8 @@
 # legal-skills
 
-Claude skills for legal research and legal work. Each skill is a self-contained plugin you can install on its own.
+[Agent Skills](https://agentskills.io) for legal research and legal work.
+
+Agent Skills is an open standard for giving AI agents new abilities: a skill is a folder with a `SKILL.md` file of instructions and any scripts it needs. The same folder works in Claude and Claude Code, ChatGPT and Codex, Gemini CLI, GitHub Copilot, VS Code, Cursor, and [many other agents](https://agentskills.io/clients). Each skill here is self-contained and can be installed on its own.
 
 These are research aids, not legal advice. Verify anything you rely on against the official source.
 
@@ -12,7 +14,13 @@ These are research aids, not legal advice. Verify anything you rely on against t
 
 ## Install
 
-### Claude Code
+### Any agent that supports Agent Skills
+
+1. Download the skill's ZIP file from the [latest release](https://github.com/attorneynate/legal-skills/releases) (for example `federal-law-1.0.2.zip`), or copy the skill's folder from this repository (`plugins/federal-law/skills/federal-law/`).
+2. Put the `federal-law` folder in your agent's skills folder. Where that is depends on the agent; each one's instructions are linked from [agentskills.io/clients](https://agentskills.io/clients).
+3. Complete the skill's setup (below).
+
+### Claude Code (one step, with updates)
 
 ```
 /plugin marketplace add attorneynate/legal-skills
@@ -26,21 +34,21 @@ claude plugin marketplace add attorneynate/legal-skills
 claude plugin install federal-law@legal-skills
 ```
 
-To get later releases, update the marketplace: `/plugin marketplace update legal-skills`.
-
-### By hand
-
-Copy a skill's folder (for example `plugins/federal-law/skills/federal-law/`) into `~/.claude/skills/`. Claude Code loads it at the start of the next session.
+To get later releases: `/plugin marketplace update legal-skills`. (The `plugins/` folders are Claude Code's packaging; the skill itself is the `skills/<name>/` folder inside each one.)
 
 ### Setup each skill needs
 
 Each skill's README lists its own requirements. `federal-law` needs Python 3.9 or later and a free GovInfo API key; see [its setup section](plugins/federal-law/skills/federal-law/README.md#setup).
 
-These skills run scripts that call government websites, so they need a machine with Python and open network access. Hosted environments that restrict outbound network access can't run them.
+These skills run scripts that call government websites, so they need an agent that can run Python with open network access. Hosted environments that restrict outbound network access can't run them.
+
+### Without an agent
+
+The scripts are ordinary command-line tools. For example, from the `federal-law` folder: `python3 scripts/federal_law.py usc 5 552 --pin '(b)(6)'`, or `--help` for every command.
 
 ## Status and testing
 
-Every skill ships with a self-test that runs against the live sources. GitHub Actions runs it on Windows, macOS, and Linux with Python 3.9 and 3.13 on every change and weekly, and validates the plugin manifests with `claude plugin validate --strict`.
+Every skill ships with a self-test that runs against the live sources, and every release passes it first. GitHub Actions runs the self-test on Windows, macOS, and Linux with Python 3.9 and 3.13 on every change and weekly, checks each skill with the Agent Skills standard's validator (`skills-ref`), and validates the Claude Code plugin manifests with `claude plugin validate --strict`.
 
 ## Contributing
 

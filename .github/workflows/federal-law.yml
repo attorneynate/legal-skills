@@ -18,7 +18,8 @@ defaults:
 
 jobs:
   manifests:
-    # The marketplace and plugin manifests, checked by Claude Code's own validator.
+    # The Claude Code marketplace and plugin manifests, and the skill itself against
+    # the Agent Skills standard.
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,6 +32,13 @@ jobs:
       - run: npm install -g @anthropic-ai/claude-code
       - run: claude plugin validate --strict .
       - run: claude plugin validate --strict plugins/federal-law
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Agent Skills standard validator (agentskills.io)
+        run: |
+          pip install "git+https://github.com/agentskills/agentskills#subdirectory=skills-ref"
+          skills-ref validate plugins/federal-law/skills/federal-law
 
   offline:
     # No network, no key: the script must compile and every command must parse

@@ -1,6 +1,7 @@
 ---
 name: federal-law
 license: MIT
+compatibility: Requires Python 3.9+, internet access to govinfo.gov, uscode.house.gov, ecfr.gov, and federalregister.gov, and a free GovInfo (api.data.gov) API key.
 description: Find, read, and verify U.S. federal statutes and regulations from official sources — the U.S. Code, the Code of Federal Regulations (including appendices and official interpretations), the Federal Register, public laws and the Statutes at Large, and legislative history (bills, committee reports, Congressional Record) — through GovInfo (GPO), uscode.house.gov, eCFR, and the Federal Register API. Checks whether a provision is current, shows it as it read on a past date, pulls a single subsection by pinpoint cite, and traces amendments to the law or rule that made them. Use whenever the user asks for federal statutory or regulatory text, which federal statutes or regulations define or govern something, whether a federal provision is current or was amended, what the law said on a date, a Federal Register rule, or legislative history — even if they never name GovInfo or eCFR. Not for state law or case law.
 ---
 
@@ -23,10 +24,11 @@ The script retries a request twice when a site times out or returns a server err
 
 ## Commands
 
-`S` is the script in this skill's directory. Claude Code fills in `${CLAUDE_SKILL_DIR}`; where it doesn't, use the skill's base directory.
+Paths in this skill are relative to its own folder, the one containing this `SKILL.md`. `S` below is the script's full path: that folder plus `scripts/federal_law.py`. Claude Code provides the folder as `${CLAUDE_SKILL_DIR}`, as in the second line.
 
 ```bash
-S="${CLAUDE_SKILL_DIR}/scripts/federal_law.py"
+S="<this skill's folder>/scripts/federal_law.py"
+# In Claude Code: S="${CLAUDE_SKILL_DIR}/scripts/federal_law.py"
 
 # Find
 python3 "$S" ecfr-search '"yogurt" means' --grep yogurt            # current regulations
@@ -158,7 +160,7 @@ Field operators combine with free text and quoted phrases. Each one below has be
 
 ## Maintenance
 
-`python3 "${CLAUDE_SKILL_DIR}/scripts/selftest.py"` runs 39 live checks, at least one per command and feature plus the unusual citation formats that once broke it, in about a minute. Run it after editing `federal_law.py` or when a command gives odd output. Each check reports:
+`python3 scripts/selftest.py`, run from the skill's folder, runs 39 live checks, at least one per command and feature plus the unusual citation formats that once broke it, in about a minute. Run it after editing `federal_law.py` or when a command gives odd output. Each check reports:
 - **ok**
 - **FAIL:** the script broke, or a source changed its format. Fix the script.
 - **CHANGED:** a fact recorded on 2026-09-29 has moved, such as a new GPO edition or a new amendment. That's the law changing, not a bug; update the check's expected facts.
