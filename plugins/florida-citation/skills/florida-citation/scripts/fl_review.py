@@ -113,6 +113,17 @@ def case_entries(report):
     return [entries[k] for k in order]
 
 
+def cite_list(report):
+    """Each case once, as a citation alone (name, cite, court and year), one per line: what a citation
+    tool that checks a whole list in one request needs, and nothing else from the document."""
+    lines = []
+    for e in facts_template(report)["cases"]:
+        c = e["claimed"]
+        paren = " ".join(str(x) for x in (c["court"], c["year"]) if x)
+        lines.append((f"{c['case_name']}, " if c["case_name"] else "") + e["cite"] + (f" ({paren})" if paren else ""))
+    return "\n".join(lines)
+
+
 def facts_template(report):
     out = {"about": ABOUT, "document": report["input"], "cases": []}
     for e in case_entries(report):
@@ -497,6 +508,10 @@ def render_opposing(report, facts_path=None):
     out.append("; ".join(bits))
     out.append("Everything below is something to confirm. A mismatch can be a typo, the wrong case, or a case "
                "that can't be found; report it that way.")
+    app = report.get("appended")
+    if app:
+        out.append(f"Exhibits? {app['label']} {app['why']}. To review only the filing, rerun with "
+                   f"--last-page {app['page'] - 1}.")
     facts = report.get("facts")
     if facts:
         n = facts["counts"]
@@ -505,8 +520,13 @@ def render_opposing(report, facts_path=None):
     out.append("")
     out.append("1. FACTS THAT DON'T MATCH")
     if not facts:
-        out.append("   Case facts not confirmed yet. To confirm them: run check FILE --facts-template > facts.json,")
-        out.append("   look up each case with a case-law tool and fill in its entry, then rerun with --facts facts.json.")
+        n = len(case_entries(report))
+        out.append(f"   Case facts not confirmed yet ({n} case{'s' if n != 1 else ''}). To confirm them cheaply: check FILE "
+                   "--cite-list prints each")
+        out.append("   case once, for a citation tool that checks a whole list in one request; look up only what it "
+                   "doesn't find,")
+        out.append("   one case at a time. Record the results in check FILE --facts-template > facts.json and rerun "
+                   "with --facts facts.json.")
     if not o["facts"]:
         out.append("   none" + (" found in the script's tables" if not facts else ""))
     for it in o["facts"]:
@@ -530,7 +550,8 @@ def render_opposing(report, facts_path=None):
 
     out.append("")
     out.append(f"3. QUOTATIONS TO VERIFY ({len(o['quotations'])} tied to a citation; check each against its source "
-               "with a quote tool, or by fetching the source by citation, which keeps a confidential filing's text private)")
+               "with a quote tool, or by fetching the source by citation, which keeps a confidential filing's text "
+               "private. Each one means reading its source, so start with the ones the argument rests on)")
     for q in o["quotations"]:
         src = q["cited_as"]
         if q["source"] and q["source"] != q["cited_as"]:

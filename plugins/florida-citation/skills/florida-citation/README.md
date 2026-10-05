@@ -73,9 +73,13 @@ In someone else's brief, a citation that's wrong in substance matters far more t
 
 The facts loop:
 
-- The skill writes a facts file listing each case once (full citations, short forms, and Id. merged), with what the brief claims.
-- The agent looks each case up with whatever case-law tool it has and fills in what it finds.
+- The skill lists each case once, as a citation alone, for a citation tool that checks a whole list in one request (CourtListener's citation lookup takes up to 250 at a time). The list holds nothing from the brief but its citations.
+- The agent looks up, one at a time, only the cases that tool doesn't find, and records what it finds in a facts file the skill writes (full citations, short forms, and Id. merged, with what the brief claims).
 - The skill compares claim with finding and does the page arithmetic.
+
+**What it costs.** The script's report is free: it runs offline in about a second. Confirming cases costs case-law lookups, and a free tier allows only so many (CourtListener's: a few a minute, about a hundred a day), which is why the batch comes first. Verifying a quotation means reading its source, often several thousand tokens each. So the agent gives you the free report first, says what confirming the cases and the quotations would take, and goes only as far as you choose.
+
+**Exhibits.** A filing with exhibits attached (a slip sheet such as "Exhibit 1", or a Westlaw or Lexis printout of an opinion) gets a note at the top of the report: their citations and quotations are another writer's. `--last-page N` checks only the filing.
 
 The judgment stays with the agent and the arithmetic with the script. The report frames every item as something to confirm: a mismatch can be a typo, a parallel cite, the wrong case, or a case that doesn't exist. It never calls a case fake.
 
@@ -98,7 +102,7 @@ The judgment stays with the agent and the arithmetic with the script. The report
 
 ## How it was tested
 
-Before release, it was run against 28 Florida court opinions and 18 Florida Supreme Court briefs. The opinions come from the Supreme Court and all six District Courts of Appeal, 13 of them filed after the September 1, 2026 amendment. Courts follow Rule 9.800, so every flag on an opinion was treated as a false positive until shown otherwise; each flag left is a confirmed departure by the court itself, such as `(Fla. 2nd DCA 2013)` or a 1925 case cited to So. 2d. Planted errors in 65 citations and in four altered briefs (a wrong pinpoint, year, court, and quotation) are all found. Four trial-court motions (one scanned and OCR'd, one image-only, two born digital, one of those a certified copy from a clerk's portal with a diagonal watermark) were then run through the workflow; every false flag and miss they surfaced was fixed and is covered by a test. The corpus and the motions read the same under both pdftotext builds (Poppler and Xpdf).
+Before release, it was run against 28 Florida court opinions and 18 Florida Supreme Court briefs. The opinions come from the Supreme Court and all six District Courts of Appeal, 13 of them filed after the September 1, 2026 amendment. Courts follow Rule 9.800, so every flag on an opinion was treated as a false positive until shown otherwise; each flag left is a confirmed departure by the court itself, such as `(Fla. 2nd DCA 2013)` or a 1925 case cited to So. 2d. Planted errors in 65 citations and in four altered briefs (a wrong pinpoint, year, court, and quotation) are all found. Five trial-court motions (one scanned and OCR'd, two image-only, two born digital, one of those a certified copy from a clerk's portal with a diagonal watermark, one with five exhibits attached) were then run through the workflow; every false flag they surfaced was fixed and is covered by a test. The corpus and the motions read the same under both pdftotext builds (Poppler and Xpdf).
 
 ## Setup
 
@@ -130,7 +134,7 @@ Ask your agent things like:
 - "Check the citations in my initial brief," with the file attached.
 - "Review the citations in the answer brief we were served. Which cases or pinpoints don't hold up?"
 
-The script also works on its own: `python3 scripts/fl_cite.py --help`. Its commands are `rule`, `abbrev`, `casenum`, `checks` (the check records), `build`, and `check` (with `--json`, `--mode opposing`, `--facts-template`, and `--facts`).
+The script also works on its own: `python3 scripts/fl_cite.py --help`. Its commands are `rule`, `abbrev`, `casenum`, `checks` (the check records), `build`, and `check` (with `--json`, `--last-page`, `--mode opposing`, `--cite-list`, `--facts-template`, and `--facts`).
 
 ## Sources
 

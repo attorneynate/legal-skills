@@ -102,6 +102,14 @@ COMMANDS = [
      ["check", "-", "--date", "2026-10-01"],
      "Cover page\n\ni\n\fArgument text.\n\nSmith v. Jones, 594 So.2d 292 (Fla. 1992).\n\n1\n",
      [r"^  p\. 1 \(PDF p\. 2\)\s+\[9\.800\(a\)\(1\)\] So\.2d"], 0),
+    ("check notes exhibits after the filing",
+     ["check", "-", "--date", "2026-10-01", "--mode", "opposing"],
+     "Argument. Smith v. Jones, 594 So. 2d 292 (Fla. 1992).\n\fExhibit 1\n\fRoe v. Doe, 600 So. 2d 100 (Fla. 1993).\n",
+     [r'^Exhibits\? PDF p\. 2 reads only "Exhibit 1"\. To review only the filing, rerun with --last-page 1\.$'], 0),
+    ("check --last-page and --cite-list give the filing's cases alone",
+     ["check", "-", "--date", "2026-10-01", "--last-page", "1", "--cite-list"],
+     "Argument. Smith v. Jones, 594 So. 2d 292 (Fla. 1992).\n\fExhibit 1\n\fRoe v. Doe, 600 So. 2d 100 (Fla. 1993).\n",
+     [r"\ASmith v\. Jones, 594 So\. 2d 292 \(Fla\. 1992\)\n\Z"], 0),
 ]
 
 DOCUMENT = "The rule is settled. Fenelon v. State, 594 So. 2d 292, 297 (Fla. 1992).\n"

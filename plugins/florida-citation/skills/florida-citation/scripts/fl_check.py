@@ -57,6 +57,30 @@ class Source:
         self.line_labels = line_labels
         self.blocks = blocks
         self.footnote_starts = footnote_starts
+        self.cut = None                  # (last page kept, pages in all) after first_pages
+
+
+def first_pages(source, n):
+    """The Source cut after its nth page (--last-page), so exhibits or an appendix after the document
+    aren't checked. Offsets before the cut are unchanged, so the layout's blocks and footnotes still fit."""
+    if source.kind == "docx":
+        sys.exit("--last-page works on PDFs and text with form feeds; a .docx's pages aren't fixed. "
+                 "Save the document without its exhibits, or as a PDF, and check that.")
+    if n < 1:
+        sys.exit("--last-page takes a page number of 1 or more.")
+    ff = [i for i, ch in enumerate(source.text) if ch == "\f"]
+    if not ff:
+        sys.exit("--last-page needs a document with pages: a PDF, or text with a form feed between pages.")
+    total = len(ff) + (1 if source.text[ff[-1] + 1:].strip() else 0)
+    if n >= total:
+        return source
+    end = ff[n - 1] + 1
+    cut = Source(source.text[:end], source.name, source.kind, emphasis=source.emphasis,
+                 blocks=[b for b in source.blocks if b[0] < end] if source.blocks is not None else None,
+                 footnote_starts=[f for f in source.footnote_starts if f < end]
+                 if source.footnote_starts is not None else None)
+    cut.cut = (n, total)
+    return cut
 
 
 def decode(data):
@@ -106,6 +130,9 @@ NO_OCRMYPDF = ("To install OCRmyPDF and Tesseract, the OCR engine it runs:\n"
                "each finding's pinpoint against the page.")
 SCANNED_PAGE_CHARS = 100        # most pages with less text than this means a scanned PDF
 EMPTY_PAGE_CHARS = 20            # a page with less than this is listed in the report's notes
+# A page that is only a slip sheet before an exhibit or appendix, and a case database's print footer.
+SLIP_SHEET = re.compile(r"(?i)(?:exhibit|exh?\.|attachment|appendix|app\.|tab)\s*[\w.\-]{0,6}")
+PRINTOUT = re.compile(r"(?i)\b(Westlaw)\b[^\n]{0,25}\bThomson Reuters\b|\bmember of the (LexisNexis) Group\b")
 
 
 NODIAG_SLACK = 60                # characters a page may lose to -nodiag: a watermark's worth ...
@@ -1033,6 +1060,24 @@ class Doc:
             if len(re.sub(r"\s", "", text)) < EMPTY_PAGE_CHARS:
                 out.append(i + 1)
         return out
+
+    def appended(self):
+        """Where exhibits or an appendix seem to begin, after page 1: the first page that is only a slip
+        sheet ("Exhibit 1", "Appendix A"), else the first page printed from a case database (a Westlaw
+        or Lexis footer). Returns {"page", "why"} or None. Their citations are another writer's."""
+        if not self.ff:
+            return None
+        bounds = [-1] + self.ff + [len(self.raw)]
+        printed = None
+        for i in range(1, min(self.pages, len(bounds) - 1)):
+            text = "\n".join(ln for ln in self.raw[bounds[i] + 1:bounds[i + 1]].split("\n") if not STAMP.match(ln))
+            m = SLIP_SHEET.fullmatch(text.strip())
+            if m:
+                return {"page": i + 1, "why": f'reads only "{m.group(0)}"'}
+            p = PRINTOUT.search(text) if printed is None else None
+            if p:
+                printed = {"page": i + 1, "why": "is printed from " + ("Westlaw" if p.group(1) else "Lexis")}
+        return printed
 
 
 ROMAN_NUMERAL = re.compile(r"m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})", re.I)
@@ -2000,6 +2045,17 @@ class Engine:
             if c["kind"] not in ("case_short",) + SHORT_KINDS:
                 tiers[c["tier"]] = tiers.get(c["tier"], 0) + 1
         notes = []
+        appended = None
+        if source.cut:
+            notes.append(f"Checked pages 1 to {source.cut[0]} of {source.cut[1]} (--last-page {source.cut[0]}).")
+        else:
+            appended = doc.appended()
+        if appended:
+            k = appended["page"]
+            appended["label"] = doc.page_name(k)
+            notes.append(f"{doc.page_name(k)} {appended['why']}, so the pages from there on are probably exhibits "
+                         "or an appendix: another writer's citations and quotations, checked and listed with this "
+                         f"document's. To check only the document, rerun with --last-page {k - 1}.")
         if source.emphasis is None:
             notes.append("Case-name typeface (9.800(q)) can't be checked in plain text; check a .docx to cover it.")
         unclear = sum(1 for c in cites if c["kind"] == "id" and c.get("antecedent") == "unclear")
@@ -2029,6 +2085,7 @@ class Engine:
             "findings": findings,
             "citations": [_public(c) for c in cites],
             "quotations": quotations,
+            "appended": appended,
             "notes": notes,
         }
 
@@ -2900,7 +2957,7 @@ def link_short_forms(doc, cites):
             links["supras"].append({"cite": c, "full": matches[0] if len(keys) == 1 else None})
 
     # Id.: what it refers to is the preceding citation, if nothing the script can't see comes between.
-    prev = None
+    prev = earlier = None
     for c in top:
         if c["kind"] == "id" and not c["in_quote"]:
             info = {"cite": c, "prev": prev, "antecedent": None, "string": None}
@@ -2918,14 +2975,14 @@ def link_short_forms(doc, cites):
                         c["antecedent"] = "string"
                     else:
                         ant = _antecedent(prev, cites)
-                        if ant is not None:
+                        if ant is not None and not _unseen_footnote(doc, earlier, prev, c, cites):
                             info["antecedent"] = ant
                             c["antecedent"] = ant["index"]
                             c["repeats"] = prev["index"]    # the citation it repeats, pinpoint and all
                             full = cites[ant["refers_to"]] if ant["kind"] == "case_short" and ant.get("refers_to") is not None else ant
                             c["refers_to"] = full["index"]
             links["ids"].append(info)
-        prev = c
+        prev, earlier = c, prev
 
     # The same full citation twice, close together (Indigo Book R15.2.1 allows repeating it after a
     # new heading or page break, so only repeats on the same page count; separate opinions restart).
@@ -2947,6 +3004,34 @@ def link_short_forms(doc, cites):
         if c["nested_in"] is None:         # one cited inside another's parenthetical may be given in full later
             seen[k] = c
     return links
+
+
+def _id_case_first(x, cites):
+    """The first page of the case a citation stands for (a full or short case, or an Id. of one), or None."""
+    a = _antecedent(x, cites)
+    if a is None:
+        return None
+    canonical = None
+    if a["kind"] == "case_short":
+        if a.get("refers_to") is None or not a["reporters"]:
+            return None
+        canonical = a["reporters"][0]["canonical"]
+        a = cites[a["refers_to"]]
+    if a["kind"] != "case" or a["flw"] or a["online"]:
+        return None
+    return _first_page(a, canonical)
+
+
+def _unseen_footnote(doc, earlier, prev, c, cites):
+    """Is prev probably a footnote the layout didn't show? Footnotes print at the foot of a page, between its
+    body text and the next page's, and an OCR'd footnote number (5 read as >) hides one from layout_footnotes.
+    Then an Id. on the next page whose page fits the citation before prev, but comes before prev's first page,
+    belongs to that earlier citation, and what it refers to isn't clear enough to check."""
+    if earlier is None or not doc.ff or _page(prev) == _page(c) or c.get("pin_kind") != "page":
+        return False
+    n = _number(c["pin"][3:])
+    p, e = _id_case_first(prev, cites), _id_case_first(earlier, cites)
+    return n is not None and p is not None and e is not None and e <= n < p
 
 
 def _antecedent(prev, cites):

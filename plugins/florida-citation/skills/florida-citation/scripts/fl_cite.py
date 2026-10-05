@@ -6,6 +6,8 @@ Usage:
   python fl_cite.py casenum NUMBER [...]      # old case numbers to the four-digit form: SC09-839 -> SC2009-0839
   python fl_cite.py checks [--authority 9.800(f)] [--kind pattern]   # the check records
   python fl_cite.py check FILE|- [--json] [--date YYYY-MM-DD] [--citations]   # check a document
+  python fl_cite.py check FILE --last-page N  # only pages 1 to N, leaving out exhibits after the document
+  python fl_cite.py check FILE --cite-list    # each case once, citation only, for a batch citation tool
   python fl_cite.py check FILE --facts-template > facts.json   # the cases cited, for a case-law tool to confirm
   python fl_cite.py check FILE --mode opposing [--facts facts.json]   # review the other side's filing
   python fl_cite.py build TYPE ...            # a citation from its parts: case, agency, statute, annotated,
@@ -413,9 +415,15 @@ def cmd_check(args):
     if args.facts and args.facts_template:
         sys.exit("--facts-template writes a new facts file; --facts reads a filled-in one. Use one at a time.")
     facts = fl_review.facts_or_exit(args.facts, engine.data) if args.facts else None
-    report = fl_check.check(fl_check.read_source(args.file), date=date, engine=engine)
+    source = fl_check.read_source(args.file)
+    if args.last_page is not None:
+        source = fl_check.first_pages(source, args.last_page)
+    report = fl_check.check(source, date=date, engine=engine)
     if args.facts_template:
         print(json.dumps(fl_review.facts_template(report), indent=2, ensure_ascii=False))
+        return
+    if args.cite_list:
+        print(fl_review.cite_list(report))
         return
     if facts is not None:
         fl_review.compare_facts(report, facts[0], facts[1], engine.data)
@@ -460,6 +468,11 @@ def main():
                    help="write a facts file (JSON) with one entry per case cited, for a case-law tool's findings")
     d.add_argument("--facts", metavar="FACTS.json",
                    help="compare each case's court, year, name, and pages with these confirmed facts")
+    d.add_argument("--cite-list", action="store_true",
+                   help="print each case once, as a citation alone, one per line: for a citation tool that "
+                        "checks a whole list in one request (nothing else from the document is printed)")
+    d.add_argument("--last-page", type=int, metavar="N",
+                   help="check only pages 1 to N, leaving out exhibits or an appendix after the document")
     d.set_defaults(fn=cmd_check)
     import fl_build
     fl_build.register(sub)

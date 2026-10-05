@@ -1,6 +1,6 @@
 {
   "name": "florida-citation",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Format and check legal citations under Florida's Rule 9.800, with the Bluebook system through the public-domain Indigo Book for what the rule doesn't cover: the rule's text, Florida forms, case-number conversion, citations built from their parts, every citation in a brief or motion checked with its page, authority, and fix, and the other side's filing reviewed with facts and pinpoints ahead of form.",
   "author": {
     "name": "Attorney Nate",
