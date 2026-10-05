@@ -1,5 +1,9 @@
 # Changelog
 
+## federal-law 1.0.5 (2026-10-05)
+
+Never reports a rate limit or a GovInfo link-service error as a missing citation: a 429 now stops with a RATE LIMITED message saying nothing was looked up, and only GovInfo's 'no such citation' answer reads as missing.
+
 ## federal-law 1.0.4 (2026-10-05)
 
 Says plainly when uscode.house.gov is down for maintenance (it serves a maintenance page with HTTP 200 for every URL), instead of reporting missing text or editions; the self-test reports such cases as DOWN rather than failing.

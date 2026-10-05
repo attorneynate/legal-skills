@@ -98,16 +98,31 @@ socket.create_connection = _connect_ipv4_first
 TRANSIENT_HTTP = {429, 500, 502, 503, 504}
 
 
+class RateLimited(Exception):
+    """A source kept answering HTTP 429. Deliberately not a SystemExit: the handlers that
+    read a failed lookup as "not found" catch SystemExit, and a rate limit must never
+    be reported as a missing law. main() prints it; parallel() lets it through."""
+
+
 def fetch(req, opener=None, tries=3):
     """Open a request and read it: (body bytes, final URL, headers). Timeouts, dropped
-    connections, and 429/5xx responses are retried twice with a short backoff; other
-    HTTP errors (404, a redirect caught by _NoRedirect, ...) are raised to the caller."""
+    connections, and 429/5xx responses are retried twice with a short backoff; a 429
+    on every try raises RateLimited; other HTTP errors (404, a redirect caught by
+    _NoRedirect, a 5xx on every try, ...) are raised to the caller."""
     host = urllib.parse.urlsplit(req.full_url).netloc
     for attempt in range(tries):
         try:
             with (opener.open if opener else urllib.request.urlopen)(req, timeout=60) as resp:
                 return resp.read(), resp.geturl(), resp.headers
         except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt == tries - 1:
+                demo = "DEMO_KEY" in req.full_url
+                raise RateLimited(
+                    f"RATE LIMITED: {host} refused this request for making too many (HTTP 429). "
+                    "Nothing was looked up, so this says nothing about whether the citation "
+                    "exists. Wait a minute or two and try again"
+                    + (", or use your own free API key (https://www.govinfo.gov/api-signup); "
+                       "DEMO_KEY allows only a few requests." if demo else ".")) from None
             if e.code not in TRANSIENT_HTTP or attempt == tries - 1:
                 raise
         except (OSError, http.client.HTTPException) as e:  # URLError, timeouts, resets
@@ -178,14 +193,21 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def redirect_target(url):
-    """Where a URL redirects to, without downloading the target."""
+    """Where a URL redirects to, without downloading the target. None means the site
+    said there's no such thing: GovInfo's link service answers 400 for a citation it
+    doesn't have. Any other error stops with its status, so an outage isn't taken for
+    a missing citation."""
     opener = urllib.request.build_opener(_NoRedirect)
     try:
         fetch(urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), opener=opener)
     except urllib.error.HTTPError as e:
         if e.code in (301, 302, 303, 307, 308):
             return e.headers.get("Location")
-        return None
+        if e.code in (400, 404, 410):
+            return None
+        sys.exit(f"HTTP {e.code} from {urllib.parse.urlsplit(url).netloc} looking up {url}. "
+                 "The site failed to answer, which says nothing about whether the citation "
+                 "exists; try again later.")
     return None
 
 
@@ -289,12 +311,16 @@ def rule_set(lines):
 
 
 def parallel(fn, items, workers=6):
-    """fn over items concurrently; a failure (including sys.exit) yields None for that item."""
+    """fn over items concurrently; a failure (including sys.exit) yields None for that
+    item, except a rate limit, which stops the command: every result after it would be
+    a false "missing"."""
     from concurrent.futures import ThreadPoolExecutor
 
     def safe(item):
         try:
             return fn(item)
+        except RateLimited:
+            raise
         except BaseException:
             return None
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -1694,7 +1720,10 @@ def main():
     # or a pipe's locale encoding turn that into a crash.
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
-    args.fn(args)
+    try:
+        args.fn(args)
+    except RateLimited as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":
