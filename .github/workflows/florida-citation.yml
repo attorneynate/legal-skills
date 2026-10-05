@@ -4,6 +4,8 @@ name: florida-citation
 
 on:
   push:
+    # Branches only: a release pushes main and then a tag; one run is enough.
+    branches: [main]
     paths: ["plugins/florida-citation/**", ".claude-plugin/**", ".github/workflows/florida-citation.yml"]
   pull_request:
     paths: ["plugins/florida-citation/**", ".claude-plugin/**", ".github/workflows/florida-citation.yml"]

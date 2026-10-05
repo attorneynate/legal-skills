@@ -4,6 +4,9 @@ name: federal-law
 
 on:
   push:
+    # Branches only: a release pushes main and then a tag, and a second full-matrix
+    # run on the tag hits GovInfo with the same key at once (HTTP 429).
+    branches: [main]
     paths: ["plugins/federal-law/**", ".claude-plugin/**", ".github/workflows/federal-law.yml"]
   pull_request:
     paths: ["plugins/federal-law/**", ".claude-plugin/**", ".github/workflows/federal-law.yml"]
