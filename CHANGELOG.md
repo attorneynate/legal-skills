@@ -1,5 +1,9 @@
 # Changelog
 
+## federal-law 1.0.4 (2026-10-05)
+
+Says plainly when uscode.house.gov is down for maintenance (it serves a maintenance page with HTTP 200 for every URL), instead of reporting missing text or editions; the self-test reports such cases as DOWN rather than failing.
+
 ## florida-citation 1.1.0 (2026-10-05)
 
 Opposing review is cheap by default: report first, then batch case lookups (--cite-list) and quotation checks only as far as you choose. Exhibits are detected, and --last-page leaves them out. Fixes a false 'pinpoint out of range' on an Id. after an OCR'd footnote.

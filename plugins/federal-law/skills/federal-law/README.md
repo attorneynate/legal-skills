@@ -16,7 +16,7 @@ It is a research aid, not legal advice. Verify anything you rely on against the 
 ## What it doesn't do
 
 - **No state law and no case law.** It covers federal statutes and regulations only. It does not check whether a court has vacated, enjoined, or struck down a provision; the CFR and U.S. Code can keep text a court has set aside. Use a case-law tool for that.
-- **Some networks are blocked.** The Office of the Federal Register blocks some networks, often cloud servers and VPNs, from eCFR and FederalRegister.gov, even for their developer APIs. On such a network, commands that need those sites stop with an `ACCESS BLOCKED` message; the GovInfo and U.S. Code commands still work.
+- **Some networks are blocked.** The Office of the Federal Register blocks some networks, often cloud servers and VPNs, from eCFR and FederalRegister.gov, even for their developer APIs. On such a network, commands that need those sites stop with an `ACCESS BLOCKED` message; the GovInfo and U.S. Code commands still work. When uscode.house.gov is down for maintenance, commands that need it stop with an `UNAVAILABLE` message; `usc` still pulls GPO's edition from GovInfo.
 - **Currency stops where the sources stop.** uscode.house.gov and eCFR each state the date they are current through; the skill reports it. Anything after that date won't show up.
 - **Enactment is not effectiveness.** The as-of checks work from enactment and publication dates. Read the amending law's or rule's effective-date provisions before concluding what applied on a date.
 - **Keyword search.** A provision that defines a term without your exact words may not match a narrow query; the skill's instructions run a broad search as well.
@@ -67,7 +67,7 @@ This project is not affiliated with or endorsed by the Government Publishing Off
 
 ## Testing
 
-`python3 scripts/selftest.py` runs 39 checks against the live sources, one or more per feature plus the unusual citation formats it has to handle (tax regulations like 26 CFR 1.401(k)-1, FAR clauses, numbered definition sections, repealed subsections), in about a minute. Each reports **ok**, **FAIL** (the script broke or a source changed its format), **CHANGED** (a recorded fact moved, such as a new edition or amendment; the law changing, not a bug), **FLAKY** (a source hiccupped and the rerun passed), or **BLOCKED** (eCFR or FederalRegister.gov refused the network running the test).
+`python3 scripts/selftest.py` runs 39 checks against the live sources, one or more per feature plus the unusual citation formats it has to handle (tax regulations like 26 CFR 1.401(k)-1, FAR clauses, numbered definition sections, repealed subsections), in about a minute. Each reports **ok**, **FAIL** (the script broke or a source changed its format), **CHANGED** (a recorded fact moved, such as a new edition or amendment; the law changing, not a bug), **FLAKY** (a source hiccupped and the rerun passed), **BLOCKED** (eCFR or FederalRegister.gov refused the network running the test), or **DOWN** (uscode.house.gov is down for maintenance).
 
 ## License
 

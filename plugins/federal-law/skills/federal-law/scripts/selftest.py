@@ -16,9 +16,11 @@ Each case runs one federal_law.py command and makes two kinds of check:
            on both tries. The Office of the Federal Register blocks some networks,
            including some cloud servers, so this says nothing about the script;
            run the test from another network to check those cases.
+  DOWN     uscode.house.gov answered with House.gov's maintenance page on both
+           tries. That's the site, not the script; rerun those checks once it's back.
 
-Exit status is 1 if anything FAILED, else 0. Under GitHub Actions, BLOCKED and
-FLAKY cases are also raised as workflow warnings.
+Exit status is 1 if anything FAILED, else 0. Under GitHub Actions, BLOCKED, DOWN,
+and FLAKY cases are also raised as workflow warnings.
 """
 
 import os
@@ -209,6 +211,7 @@ def attempt(case):
         return ["timed out after 300s"], [], None
     out = proc.stdout + proc.stderr
     blocked = re.search(r"ACCESS BLOCKED: (\S+) refused", out)
+    down = re.search(r"([\w.]+) is down for maintenance", out)
     failures, changes = [], []
     if proc.returncode != 0 and name not in BAD_INPUT:
         failures.append(f"exit status {proc.returncode}: {out.strip()[-300:]}")
@@ -216,30 +219,37 @@ def attempt(case):
         failures.append("fell back to DEMO_KEY: no API key found")
     failures += [f"missing /{p}/" for p in must if not re.search(p, out, re.M)]
     changes += [f"no longer /{p}/" for p in expect if not re.search(p, out, re.M)]
-    return failures, changes, (blocked[1] if blocked else None)
+    if blocked:
+        outage = ("BLOCKED", f"{blocked[1]} refused this network (HTTP 403)")
+    elif down:
+        outage = ("DOWN", f"{down[1]} is down for maintenance")
+    else:
+        outage = None
+    return failures, changes, outage
 
 
 def run(case):
     """One case, rerun once if it fails: the sources are live government sites, and a
     one-off outage shouldn't fail the suite. A pass on the rerun is reported as FLAKY;
-    a site refusing this network on both tries, as BLOCKED."""
-    failures, changes, blocked = attempt(case)
+    a site refusing this network on both tries, as BLOCKED; a site down for
+    maintenance on both tries, as DOWN."""
+    failures, changes, outage = attempt(case)
     first = None
     if failures:
         first = failures
-        failures, changes, blocked = attempt(case)
-    return case[0], failures, changes, first, blocked
+        failures, changes, outage = attempt(case)
+    return case[0], failures, changes, first, outage
 
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(run, CASES))
-    counts = {"ok": 0, "FLAKY": 0, "BLOCKED": 0, "CHANGED": 0, "FAIL": 0}
+    counts = {"ok": 0, "FLAKY": 0, "BLOCKED": 0, "DOWN": 0, "CHANGED": 0, "FAIL": 0}
     in_actions = bool(os.environ.get("GITHUB_ACTIONS"))
-    for name, failures, changes, first, blocked in results:
-        if failures and blocked:
-            status, failures = "BLOCKED", [f"{blocked} refused this network (HTTP 403)"]
+    for name, failures, changes, first, outage in results:
+        if failures and outage:
+            status, failures, changes = outage[0], [outage[1]], []
         else:
             status = "FAIL" if failures else "CHANGED" if changes else "FLAKY" if first else "ok"
         counts[status] += 1
@@ -248,10 +258,11 @@ def main():
                                        if first and status == "FLAKY" else [])
         for line in detail:
             print(f"          {line}")
-        if in_actions and status in ("BLOCKED", "FLAKY"):
+        if in_actions and status in ("BLOCKED", "DOWN", "FLAKY"):
             print(f"::warning title=self-test {status}::{name}: {(detail or [''])[0][:200]}")
     print(f"\n{counts['ok']} ok, {counts['FLAKY']} flaky, {counts['BLOCKED']} blocked, "
-          f"{counts['CHANGED']} changed, {counts['FAIL']} failed, of {len(results)}")
+          f"{counts['DOWN']} down, {counts['CHANGED']} changed, {counts['FAIL']} failed, "
+          f"of {len(results)}")
     sys.exit(1 if counts["FAIL"] else 0)
 
 

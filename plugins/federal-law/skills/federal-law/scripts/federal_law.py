@@ -155,10 +155,21 @@ def fetch_page(url, allow_missing=False):
         sys.exit(f"HTTP {e.code} fetching {url}")
     for encoding in filter(None, (charset, "utf-8", "cp1252")):
         try:
-            return final, content.decode(encoding)
+            text = content.decode(encoding)
+            break
         except (UnicodeDecodeError, LookupError):
             continue
-    return final, content.decode("utf-8", errors="replace")
+    else:
+        text = content.decode("utf-8", errors="replace")
+    host = urllib.parse.urlsplit(final).netloc
+    # During House.gov maintenance, every uscode.house.gov URL answers HTTP 200 with
+    # the same "Under Maintenance" page, so the status code alone looks like success.
+    if host.endswith("house.gov") and "Site is currently under maintenance" in text:
+        sys.exit(f"UNAVAILABLE: {host} is down for maintenance (every page returns House.gov's "
+                 "maintenance notice). This is the site, not the citation; try again later. "
+                 "Until then, `usc` still pulls GPO's edition from GovInfo, but `currency`, "
+                 "`usc --as-of`, and the positive-law line need uscode.house.gov.")
+    return final, text
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -501,12 +512,15 @@ def positive_law_titles():
 
 
 def positive_law_note(title):
+    down = None
     try:
         enacted = positive_law_titles().get(str(title))
-    except SystemExit:
+    except SystemExit as e:
         enacted = None
+        down = re.search(r"[\w.]+ is down for maintenance", str(e.code))
     if enacted is None:
-        return f"Title {title}: couldn't confirm whether it has been enacted as positive law."
+        return (f"Title {title}: couldn't confirm whether it has been enacted as positive law"
+                + (f" ({down.group(0)})." if down else "."))
     if enacted:
         return (f"Title {title} is positive law: this text is itself legal evidence of the law "
                 "(1 U.S.C. 204(a)).")

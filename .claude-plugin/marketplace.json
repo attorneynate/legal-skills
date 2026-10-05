@@ -10,7 +10,7 @@
       "name": "federal-law",
       "source": "./plugins/federal-law",
       "description": "Find, read, and verify U.S. federal statutes and regulations from official sources: U.S. Code, CFR, Federal Register, public laws, and legislative history, with currency checks, as-of-date pulls, and pinpoint cites.",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "license": "MIT",
       "keywords": [
         "legal research",
