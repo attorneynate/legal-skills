@@ -1,0 +1,1255 @@
+{
+  "about": "Facts the checker relies on. Each section names its source. Rule 9.800 subdivisions are in references/rule-9.800.md; this file holds the tables behind them.",
+  "rule_as_of": "2026-09-01",
+  "rule_source": "Fla. R. App. P. 9.800 as amended by In re Amendments to Florida Rules of Appellate Procedure, No. SC2025-0241 (Fla. June 11, 2026) (corrected opinion), effective September 1, 2026",
+  "amendment_watch": {
+    "source": "Florida Supreme Court opinions amending the Rules of Appellate Procedure that mention Rule 9.800, found by CourtListener's opinion search (court=fla). scripts/selftest.py reports any opinion not listed here as CHANGED: a new amendment, or a correction, to read and fold into references/rule-9.800.md. Listed by docket and filing date, so a corrected opinion shows up as its own entry. Checked 2026-10-02.",
+    "query": "\"Florida Rules of Appellate Procedure\" AND \"9.800\"",
+    "filed_after": "2025-01-01",
+    "known": [
+      {"docket": "SC2024-0317", "filed": "2025-03-06", "note": "an earlier amendment to the appellate rules that mentions Rule 9.800"},
+      {"docket": "SC2025-0241", "filed": "2026-06-11", "note": "amended Rule 9.800 effective September 1, 2026 (the bundled text)"},
+      {"docket": "SC2025-0241", "filed": "2026-06-25", "note": "corrected opinion in SC2025-0241, still dated June 11, 2026; its Rule 9.800 appendix matches the bundled text"}
+    ]
+  },
+  "courts": {
+    "source": "Rule 9.800(a)-(c) for the forms. Start dates: the courts' histories (the First, Second, and Third DCAs created 1957, the Fourth 1965, the Fifth 1979, the Sixth effective January 1, 2023 under HB 7027 (2022)).",
+    "florida_appellate": [
+      {
+        "id": "SC",
+        "name": "Supreme Court of Florida",
+        "paren": "Fla.",
+        "docket_prefix": "SC",
+        "flw_section": "S",
+        "began": "1846",
+        "rule": "9.800(a)"
+      },
+      {
+        "id": "1D",
+        "name": "First District Court of Appeal",
+        "paren": "Fla. 1st DCA",
+        "docket_prefix": "1D",
+        "flw_section": "D",
+        "began": "1957",
+        "rule": "9.800(b)"
+      },
+      {
+        "id": "2D",
+        "name": "Second District Court of Appeal",
+        "paren": "Fla. 2d DCA",
+        "docket_prefix": "2D",
+        "flw_section": "D",
+        "began": "1957",
+        "rule": "9.800(b)"
+      },
+      {
+        "id": "3D",
+        "name": "Third District Court of Appeal",
+        "paren": "Fla. 3d DCA",
+        "docket_prefix": "3D",
+        "flw_section": "D",
+        "began": "1957",
+        "rule": "9.800(b)"
+      },
+      {
+        "id": "4D",
+        "name": "Fourth District Court of Appeal",
+        "paren": "Fla. 4th DCA",
+        "docket_prefix": "4D",
+        "flw_section": "D",
+        "began": "1965",
+        "rule": "9.800(b)"
+      },
+      {
+        "id": "5D",
+        "name": "Fifth District Court of Appeal",
+        "paren": "Fla. 5th DCA",
+        "docket_prefix": "5D",
+        "flw_section": "D",
+        "began": "1979",
+        "rule": "9.800(b)"
+      },
+      {
+        "id": "6D",
+        "name": "Sixth District Court of Appeal",
+        "paren": "Fla. 6th DCA",
+        "docket_prefix": "6D",
+        "flw_section": "D",
+        "began": "2023-01-01",
+        "rule": "9.800(b)"
+      }
+    ],
+    "dca_ordinal_mistakes": {
+      "1st": "1st",
+      "2nd": "2d",
+      "2d": "2d",
+      "3rd": "3d",
+      "3d": "3d",
+      "4th": "4th",
+      "5th": "5th",
+      "6th": "6th"
+    },
+    "circuit_paren": "Fla. {ordinal} Cir. Ct.",
+    "ordinal_note": "Ordinals follow the rule's style: 1st, 2d, 3d, 4th ... 11th, 12th, 13th ... 21st, 22d, 23d (9.800(b), (c)).",
+    "circuit_count": 20,
+    "county_paren": "{county} Cty. Ct.",
+    "federal_courts_of_appeals": [
+      {
+        "paren": "1st Cir."
+      },
+      {
+        "paren": "2d Cir."
+      },
+      {
+        "paren": "3d Cir."
+      },
+      {
+        "paren": "4th Cir."
+      },
+      {
+        "paren": "5th Cir."
+      },
+      {
+        "paren": "6th Cir."
+      },
+      {
+        "paren": "7th Cir."
+      },
+      {
+        "paren": "8th Cir."
+      },
+      {
+        "paren": "9th Cir."
+      },
+      {
+        "paren": "10th Cir."
+      },
+      {
+        "paren": "11th Cir.",
+        "began": "1981-10-01",
+        "note": "Created from the Fifth Circuit; before then, Florida appeals went to the Fifth Circuit."
+      },
+      {
+        "paren": "D.C. Cir."
+      },
+      {
+        "paren": "Fed. Cir.",
+        "began": "1982-10-01"
+      }
+    ],
+    "florida_federal_districts": [
+      {
+        "paren": "N.D. Fla."
+      },
+      {
+        "paren": "M.D. Fla.",
+        "began": "1962"
+      },
+      {
+        "paren": "S.D. Fla."
+      }
+    ]
+  },
+  "states": {
+    "about": "Other states' abbreviations, from the Indigo Book, Table T12 (CC0). The facts loop reads another state's court by them: (Del. Ch. 2001), or a full name that names the state.",
+    "names": {"Ala.": "Alabama", "Alaska": "Alaska", "Ariz.": "Arizona", "Ark.": "Arkansas", "Cal.": "California", "Colo.": "Colorado", "Conn.": "Connecticut", "Del.": "Delaware", "Ga.": "Georgia", "Haw.": "Hawaii", "Idaho": "Idaho", "Ill.": "Illinois", "Ind.": "Indiana", "Iowa": "Iowa", "Kan.": "Kansas", "Ky.": "Kentucky", "La.": "Louisiana", "Me.": "Maine", "Md.": "Maryland", "Mass.": "Massachusetts", "Mich.": "Michigan", "Minn.": "Minnesota", "Miss.": "Mississippi", "Mo.": "Missouri", "Mont.": "Montana", "Neb.": "Nebraska", "Nev.": "Nevada", "N.H.": "New Hampshire", "N.J.": "New Jersey", "N.M.": "New Mexico", "N.Y.": "New York", "N.C.": "North Carolina", "N.D.": "North Dakota", "Ohio": "Ohio", "Okla.": "Oklahoma", "Or.": "Oregon", "Pa.": "Pennsylvania", "R.I.": "Rhode Island", "S.C.": "South Carolina", "S.D.": "South Dakota", "Tenn.": "Tennessee", "Tex.": "Texas", "Utah": "Utah", "Vt.": "Vermont", "Va.": "Virginia", "Wash.": "Washington", "W. Va.": "West Virginia", "Wis.": "Wisconsin", "Wyo.": "Wyoming", "D.C.": "District of Columbia", "Am. Sam.": "American Samoa", "Guam": "Guam", "N. Mar. I.": "Northern Mariana Islands", "P.R.": "Puerto Rico", "V.I.": "Virgin Islands"}
+  },
+  "counties": {
+    "source": "Florida's 67 counties. County courts take the form '{county} Cty. Ct.' per 9.800(c)(2).",
+    "names": [
+      "Alachua",
+      "Baker",
+      "Bay",
+      "Bradford",
+      "Brevard",
+      "Broward",
+      "Calhoun",
+      "Charlotte",
+      "Citrus",
+      "Clay",
+      "Collier",
+      "Columbia",
+      "DeSoto",
+      "Dixie",
+      "Duval",
+      "Escambia",
+      "Flagler",
+      "Franklin",
+      "Gadsden",
+      "Gilchrist",
+      "Glades",
+      "Gulf",
+      "Hamilton",
+      "Hardee",
+      "Hendry",
+      "Hernando",
+      "Highlands",
+      "Hillsborough",
+      "Holmes",
+      "Indian River",
+      "Jackson",
+      "Jefferson",
+      "Lafayette",
+      "Lake",
+      "Lee",
+      "Leon",
+      "Levy",
+      "Liberty",
+      "Madison",
+      "Manatee",
+      "Marion",
+      "Martin",
+      "Miami-Dade",
+      "Monroe",
+      "Nassau",
+      "Okaloosa",
+      "Okeechobee",
+      "Orange",
+      "Osceola",
+      "Palm Beach",
+      "Pasco",
+      "Pinellas",
+      "Polk",
+      "Putnam",
+      "Santa Rosa",
+      "Sarasota",
+      "Seminole",
+      "St. Johns",
+      "St. Lucie",
+      "Sumter",
+      "Suwannee",
+      "Taylor",
+      "Union",
+      "Volusia",
+      "Wakulla",
+      "Walton",
+      "Washington"
+    ]
+  },
+  "reporters": {
+    "source": "Forms from Rule 9.800 and the Indigo Book. Years are the span of decisions each series reports; neighboring series overlap by a year or so (volume 999 of So. 2d holds early-2009 decisions, volume 1 of So. 2d some 1940 ones). Spot-checked 2026-10-01 against decision dates in So. 2d volumes 1 and 998-999, F.4th volume 1 (June 2021), F. Supp. 2d volume 999 (2013-2014). The other spans are the series' published ranges. The checker flags a year only when it falls outside first-1 to last+1.",
+    "series": [
+      {
+        "abbr": "Fla.",
+        "name": "Florida Reports",
+        "first": 1846,
+        "last": 1948,
+        "cite_alone_until": 1886,
+        "rule": "9.800(a)(2)",
+        "note": "Cite Fla. alone for 1846-1886; from 1887, cite Southern Reporter (9.800(a)(1))."
+      },
+      {
+        "abbr": "So.",
+        "name": "Southern Reporter",
+        "first": 1886,
+        "last": 1941,
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "abbr": "So. 2d",
+        "name": "Southern Reporter, Second Series",
+        "first": 1940,
+        "last": 2009,
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "abbr": "So. 3d",
+        "name": "Southern Reporter, Third Series",
+        "first": 2008,
+        "last": null,
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "abbr": "U.S.",
+        "name": "United States Reports",
+        "first": 1790,
+        "last": null,
+        "rule": "9.800(l)"
+      },
+      {
+        "abbr": "S. Ct.",
+        "name": "Supreme Court Reporter",
+        "first": 1882,
+        "last": null,
+        "rule": "9.800(l)(2)"
+      },
+      {
+        "abbr": "F.",
+        "name": "Federal Reporter",
+        "first": 1880,
+        "last": 1924,
+        "rule": "9.800(m)"
+      },
+      {
+        "abbr": "F.2d",
+        "name": "Federal Reporter, Second Series",
+        "first": 1924,
+        "last": 1993,
+        "rule": "9.800(m)(1)"
+      },
+      {
+        "abbr": "F.3d",
+        "name": "Federal Reporter, Third Series",
+        "first": 1993,
+        "last": 2021,
+        "rule": "9.800(m)"
+      },
+      {
+        "abbr": "F.4th",
+        "name": "Federal Reporter, Fourth Series",
+        "first": 2021,
+        "last": null,
+        "rule": "9.800(m)"
+      },
+      {
+        "abbr": "F. App'x",
+        "name": "Federal Appendix",
+        "first": 2001,
+        "last": 2021,
+        "rule": "9.800(m)(2)"
+      },
+      {
+        "abbr": "F. Supp.",
+        "name": "Federal Supplement",
+        "first": 1932,
+        "last": 1998,
+        "rule": "9.800(n)(1)"
+      },
+      {
+        "abbr": "F. Supp. 2d",
+        "name": "Federal Supplement, Second Series",
+        "first": 1997,
+        "last": 2014,
+        "rule": "9.800(n)"
+      },
+      {
+        "abbr": "F. Supp. 3d",
+        "name": "Federal Supplement, Third Series",
+        "first": 2014,
+        "last": null,
+        "rule": "9.800(n)"
+      },
+      {
+        "abbr": "Fla. Supp.",
+        "name": "Florida Supplement",
+        "first": 1948,
+        "last": 1980,
+        "rule": "9.800(c)(3)",
+        "note": "Span approximate; confirm before using it for a date check.",
+        "date_check": false
+      },
+      {
+        "abbr": "Fla. Supp. 2d",
+        "name": "Florida Supplement, Second Series",
+        "first": 1980,
+        "last": 1992,
+        "rule": "9.800(c)(3)",
+        "note": "Span approximate; confirm before using it for a date check.",
+        "date_check": false
+      }
+    ],
+    "us_reports_lag_years": 3,
+    "us_reports_note": "United States Reports pages are assigned a year or two after decision, so courts cite S. Ct. alone for recent cases and for cert. denials. A case cited to S. Ct. alone (not as subsequent history) and decided 3 or more years before the document is flagged as a check.",
+    "misspellings": [
+      {
+        "wrong": "so.2d",
+        "right": "So. 2d",
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "wrong": "so. 2d",
+        "right": "So. 2d",
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "wrong": "so.3d",
+        "right": "So. 3d",
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "wrong": "so. 3d",
+        "right": "So. 3d",
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "wrong": "So.2d",
+        "right": "So. 2d",
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "wrong": "So.3d",
+        "right": "So. 3d",
+        "rule": "9.800(a)(1)"
+      },
+      {
+        "wrong": "F. 2d",
+        "right": "F.2d",
+        "rule": "9.800(m)(1)"
+      },
+      {
+        "wrong": "F. 3d",
+        "right": "F.3d",
+        "rule": "9.800(m)(1)"
+      },
+      {
+        "wrong": "F. 4th",
+        "right": "F.4th",
+        "rule": "9.800(m)(1)"
+      },
+      {
+        "wrong": "F.Supp.",
+        "right": "F. Supp.",
+        "rule": "9.800(n)(1)"
+      },
+      {
+        "wrong": "F.Supp.2d",
+        "right": "F. Supp. 2d",
+        "rule": "9.800(n)(1)"
+      },
+      {
+        "wrong": "F. Supp.2d",
+        "right": "F. Supp. 2d",
+        "rule": "9.800(n)(1)"
+      },
+      {
+        "wrong": "F.Supp.3d",
+        "right": "F. Supp. 3d",
+        "rule": "9.800(n)(1)"
+      },
+      {
+        "wrong": "F. Supp.3d",
+        "right": "F. Supp. 3d",
+        "rule": "9.800(n)(1)"
+      },
+      {
+        "wrong": "Fed. Appx.",
+        "right": "F. App'x",
+        "rule": "9.800(m)(2)"
+      },
+      {
+        "wrong": "Fed.Appx.",
+        "right": "F. App'x",
+        "rule": "9.800(m)(2)"
+      },
+      {
+        "wrong": "F. Appx.",
+        "right": "F. App'x",
+        "rule": "9.800(m)(2)"
+      },
+      {
+        "wrong": "F.App'x",
+        "right": "F. App'x",
+        "rule": "9.800(m)(2)"
+      },
+      {
+        "wrong": "Fed. App'x",
+        "right": "F. App'x",
+        "rule": "9.800(m)(2)"
+      },
+      {
+        "wrong": "Fed.App'x",
+        "right": "F. App'x",
+        "rule": "9.800(m)(2)"
+      },
+      {
+        "wrong": "S.Ct.",
+        "right": "S. Ct.",
+        "rule": "9.800(l)(2)"
+      },
+      {
+        "wrong": "L.Ed.2d",
+        "right": "L. Ed. 2d",
+        "rule": "9.800(p); Indigo Book T1.1"
+      },
+      {
+        "wrong": "L. Ed.2d",
+        "right": "L. Ed. 2d",
+        "rule": "9.800(p); Indigo Book T1.1"
+      },
+      {
+        "wrong": "L.Ed. 2d",
+        "right": "L. Ed. 2d",
+        "rule": "9.800(p); Indigo Book T1.1"
+      },
+      {
+        "wrong": "L.Ed.",
+        "right": "L. Ed.",
+        "rule": "9.800(p); Indigo Book T1.1"
+      }
+    ],
+    "bluebook_source": "Reporters Rule 9.800 doesn't name, read as case citations that 9.800(p) sends to the Bluebook system: the regional reporters (Indigo Book T3) and four federal reporters (T1.1). Spans from those tables and Free Law Project's reporters-db, checked 2026-10-03; N.W.3d (2024) postdates the Indigo Book's 2023 update. Their courts and years aren't checked.",
+    "bluebook_series": [
+      {"abbr": "A.", "name": "Atlantic Reporter", "first": 1885, "last": 1938, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "A.2d", "name": "Atlantic Reporter, Second Series", "first": 1938, "last": 2010, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "A.3d", "name": "Atlantic Reporter, Third Series", "first": 2010, "last": null, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "N.E.", "name": "North Eastern Reporter", "first": 1884, "last": 1936, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "N.E.2d", "name": "North Eastern Reporter, Second Series", "first": 1936, "last": 2013, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "N.E.3d", "name": "North Eastern Reporter, Third Series", "first": 2013, "last": null, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "N.W.", "name": "North Western Reporter", "first": 1880, "last": 1942, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "N.W.2d", "name": "North Western Reporter, Second Series", "first": 1942, "last": 2023, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "N.W.3d", "name": "North Western Reporter, Third Series", "first": 2024, "last": null, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "P.", "name": "Pacific Reporter", "first": 1883, "last": 1931, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "P.2d", "name": "Pacific Reporter, Second Series", "first": 1931, "last": 2000, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "P.3d", "name": "Pacific Reporter, Third Series", "first": 2000, "last": null, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "S.E.", "name": "South Eastern Reporter", "first": 1887, "last": 1939, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "S.E.2d", "name": "South Eastern Reporter, Second Series", "first": 1939, "last": null, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "S.W.", "name": "South Western Reporter", "first": 1886, "last": 1928, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "S.W.2d", "name": "South Western Reporter, Second Series", "first": 1928, "last": 1999, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "S.W.3d", "name": "South Western Reporter, Third Series", "first": 1999, "last": null, "rule": "9.800(p); Indigo Book T3"},
+      {"abbr": "F.R.D.", "name": "Federal Rules Decisions", "first": 1938, "last": null, "rule": "9.800(p); Indigo Book T1.1"},
+      {"abbr": "B.R.", "name": "Bankruptcy Reporter", "first": 1979, "last": null, "rule": "9.800(p); Indigo Book T1.1"},
+      {"abbr": "Fed. Cl.", "name": "Federal Claims Reporter", "first": 1992, "last": null, "rule": "9.800(p); Indigo Book T1.1"},
+      {"abbr": "T.C.", "name": "Reports of the United States Tax Court", "first": 1942, "last": null, "rule": "9.800(p); Indigo Book T1.1"}
+    ],
+    "bluebook_misspellings": [
+      {"wrong": "A. 2d", "right": "A.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "A. 3d", "right": "A.3d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "N.E. 2d", "right": "N.E.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "N. E. 2d", "right": "N.E.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "N.E. 3d", "right": "N.E.3d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "N. E. 3d", "right": "N.E.3d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "N.W. 2d", "right": "N.W.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "N. W. 2d", "right": "N.W.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "N.W. 3d", "right": "N.W.3d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "P. 2d", "right": "P.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "P. 3d", "right": "P.3d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "S.E. 2d", "right": "S.E.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "S. E. 2d", "right": "S.E.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "S.W. 2d", "right": "S.W.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "S. W. 2d", "right": "S.W.2d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "S.W. 3d", "right": "S.W.3d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "S. W. 3d", "right": "S.W.3d", "rule": "9.800(p); Indigo Book T3"},
+      {"wrong": "F. R. D.", "right": "F.R.D.", "rule": "9.800(p); Indigo Book T1.1"},
+      {"wrong": "B. R.", "right": "B.R.", "rule": "9.800(p); Indigo Book T1.1"},
+      {"wrong": "Fed.Cl.", "right": "Fed. Cl.", "rule": "9.800(p); Indigo Book T1.1"},
+      {"wrong": "T. C.", "right": "T.C.", "rule": "9.800(p); Indigo Book T1.1"}
+    ]
+  },
+  "florida_law_weekly": {
+    "source": "Rule 9.800's examples and the 2024-2026 cites in the test corpus. Volumes don't track the calendar exactly, so each edition allows a window: volume - (year - offset) must be one of 'allow'. Main edition: 16 = 1991, 17 = 1992, 49 = 2024, 51 = 2026; a late-year decision can appear in the next year's volume. Supplement: 17 = 2010, 22 = 2014, 32 = 2024 (offsets 1993 and 1992 both occur). Federal: only the rule's three 1991 examples (volume 13), so the window is wider.",
+    "editions": [
+      {
+        "abbr": "Fla. L. Weekly",
+        "sections": {
+          "S": "Supreme Court of Florida",
+          "D": "District Courts of Appeal",
+          "C": "circuit courts (before the Supplement)"
+        },
+        "rule": "9.800(a)(3), (b)(2), (c)(3)",
+        "offset": 1975,
+        "allow": [
+          0,
+          1
+        ]
+      },
+      {
+        "abbr": "Fla. L. Weekly Supp.",
+        "sections": {},
+        "rule": "9.800(c)(1)-(2)",
+        "offset": 1993,
+        "allow": [
+          0,
+          1
+        ]
+      },
+      {
+        "abbr": "Fla. L. Weekly Fed.",
+        "sections": {
+          "S": "U.S. Supreme Court",
+          "C": "federal courts of appeals",
+          "D": "federal district courts"
+        },
+        "rule": "9.800(l)(2), (m)(2), (n)(2)",
+        "offset": 1978,
+        "allow": [
+          -1,
+          0,
+          1
+        ]
+      }
+    ],
+    "page_suffix": "Pages may carry a letter suffix (S197c, Supp. 305a).",
+    "stale_after_months": 12,
+    "stale_note": "Fla. L. Weekly is cited only for cases not published in Southern Reporter (9.800(a)(3), (b)(2)). Decisions usually reach So. 3d within months; the 2026 opinions in the test corpus cite Fla. L. Weekly only for decisions under four months old. A main-edition cite more than 12 months older than the document is flagged as a check."
+  },
+  "case_numbers": {
+    "source": "Rule 9.800(a)(3), (b)(2) as amended by SC2025-0241 (effective 2026-09-01): four-digit year and four-digit case number, e.g. SC2000-0280, 1D2001-2734.",
+    "new_form_effective": "2026-09-01",
+    "prefixes": [
+      "SC",
+      "1D",
+      "2D",
+      "3D",
+      "4D",
+      "5D",
+      "6D"
+    ],
+    "two_digit_century_cutoff": 26,
+    "century_note": "Old forms used a two-digit year. 00-26 are read as 20YY and 27-99 as 19YY: courts stopped issuing the old form before 2027, so no old-form number can mean 2027 or later."
+  },
+  "rule_sets": {
+    "source": "Rule 9.800(j)(1)-(23). 'numbers' is a regex for the set's rule numbers, where it has a fixed pattern; it lets the checker notice a rule cited to the wrong set.",
+    "sets": [
+      {
+        "n": 1,
+        "name": "Florida Rules of Civil Procedure",
+        "abbr": "Fla. R. Civ. P.",
+        "example": "1.180",
+        "numbers": "^1\\.\\d+",
+        "variants": [
+          "Fla.R.Civ.P.",
+          "Fla. R. Civ. Pro.",
+          "Fla. R. Civ. Proc.",
+          "Fla.R.Civ.Pro."
+        ]
+      },
+      {
+        "n": 2,
+        "name": "Florida Rules of Civil Procedure for Involuntary Commitment of Sexually Violent Predators",
+        "abbr": "Fla. R. Civ. P.–S.V.P.",
+        "example": "4.010",
+        "numbers": "^4\\.\\d+",
+        "variants": [
+          "Fla. R. Civ. P.-S.V.P."
+        ]
+      },
+      {
+        "n": 3,
+        "name": "Florida Rules of General Practice and Judicial Administration",
+        "abbr": "Fla. R. Gen. Prac. & Jud. Admin.",
+        "example": "2.110",
+        "numbers": "^2\\.\\d+",
+        "variants": [
+          "Fla. R. Jud. Admin.",
+          "Fla.R.Jud.Admin.",
+          "Fla. R. Gen. Prac. and Jud. Admin."
+        ],
+        "former_names": [
+          "Florida Rules of Judicial Administration"
+        ],
+        "note": "The rule set was renamed; Rule 9.800(j)(3) gives the current name."
+      },
+      {
+        "n": 4,
+        "name": "Florida Rules of Criminal Procedure",
+        "abbr": "Fla. R. Crim. P.",
+        "example": "3.850",
+        "numbers": "^3\\.\\d+",
+        "variants": [
+          "Fla.R.Crim.P.",
+          "Fla. R. Crim. Pro.",
+          "Fla. R. Crim. Proc."
+        ]
+      },
+      {
+        "n": 5,
+        "name": "Florida Probate Rules",
+        "abbr": "Fla. Prob. R.",
+        "example": "5.120",
+        "numbers": "^5\\.\\d+",
+        "variants": [
+          "Fla. R. Prob.",
+          "Fla. Probate R."
+        ]
+      },
+      {
+        "n": 6,
+        "name": "Florida Rules of Traffic Court",
+        "abbr": "Fla. R. Traf. Ct.",
+        "example": "6.165",
+        "numbers": "^6\\.\\d+",
+        "variants": [
+          "Fla. R. Traffic Ct."
+        ]
+      },
+      {
+        "n": 7,
+        "name": "Florida Small Claims Rules",
+        "abbr": "Fla. Sm. Cl. R.",
+        "example": "7.070",
+        "numbers": "^7\\.\\d+",
+        "variants": [
+          "Fla. Small Cl. R.",
+          "Fla. Sm. Claims R."
+        ]
+      },
+      {
+        "n": 8,
+        "name": "Florida Rules of Juvenile Procedure",
+        "abbr": "Fla. R. Juv. P.",
+        "example": "8.070",
+        "numbers": "^8\\.\\d+",
+        "variants": [
+          "Fla.R.Juv.P.",
+          "Fla. R. Juv. Pro."
+        ]
+      },
+      {
+        "n": 9,
+        "name": "Florida Rules of Appellate Procedure",
+        "abbr": "Fla. R. App. P.",
+        "example": "9.100",
+        "numbers": "^9\\.\\d+",
+        "variants": [
+          "Fla.R.App.P.",
+          "Fla. R. App. Pro.",
+          "Fla. R. App. Proc.",
+          "Fla.R.App.Pro."
+        ]
+      },
+      {
+        "n": 10,
+        "name": "Florida Rules for Certified and Court-Appointed Mediators",
+        "abbr": "Fla. R. Med.",
+        "example": "10.100",
+        "numbers": "^10\\.\\d+",
+        "variants": []
+      },
+      {
+        "n": 11,
+        "name": "Florida Rules for Court-Appointed Arbitrators",
+        "abbr": "Fla. R. Arb.",
+        "example": "11.010",
+        "numbers": "^11\\.\\d+",
+        "variants": []
+      },
+      {
+        "n": 12,
+        "name": "Florida Family Law Rules of Procedure",
+        "abbr": "Fla. Fam. L. R. P.",
+        "example": "12.010",
+        "numbers": "^12\\.\\d+",
+        "variants": [
+          "Fla. Fam. Law R. P.",
+          "Fla. Fam. L. R. Pro.",
+          "Fla. Fam. Law R. Proc.",
+          "Fla. Fam. L.R.P."
+        ]
+      },
+      {
+        "n": 13,
+        "name": "Rules Regulating the Florida Bar",
+        "abbr": "R. Regulating Fla. Bar",
+        "example": "4-1.10",
+        "numbers": "^\\d+-\\d+(\\.\\d+)*",
+        "variants": [
+          "Rules Regulating Fla. Bar",
+          "R. Reg. Fla. Bar"
+        ]
+      },
+      {
+        "n": 14,
+        "name": "Code of Judicial Conduct",
+        "abbr": "Fla. Code Jud. Conduct, Canon",
+        "example": "4B",
+        "numbers": "^\\d[A-Z]?",
+        "variants": []
+      },
+      {
+        "n": 15,
+        "name": "Florida Bar Foundation Bylaws",
+        "abbr": "Fla. Bar Found. Bylaws, art.",
+        "example": "2.19(b)",
+        "numbers": null,
+        "variants": []
+      },
+      {
+        "n": 16,
+        "name": "Florida Bar Foundation Charter",
+        "abbr": "Fla. Bar Found. Charter, art.",
+        "example": "III, § 3.4",
+        "numbers": null,
+        "variants": []
+      },
+      {
+        "n": 17,
+        "name": "Integration Rule of the Florida Bar",
+        "abbr": "Fla. Bar Integr. R., art.",
+        "example": "XI, §11.09 (1981)",
+        "numbers": null,
+        "variants": []
+      },
+      {
+        "n": 18,
+        "name": "Florida Judicial Qualifications Commission Rules",
+        "abbr": "Fla. Jud. Qual. Comm'n R.",
+        "example": "9",
+        "numbers": "^\\d+",
+        "variants": []
+      },
+      {
+        "n": 19,
+        "name": "Florida Standard Jury Instructions, Civil",
+        "abbr": "Fla. Std. Jury Instr. (Civ.)",
+        "example": "601.4",
+        "numbers": null,
+        "variants": []
+      },
+      {
+        "n": 20,
+        "name": "Florida Standard Jury Instructions, Contract and Business",
+        "abbr": "Fla. Std. Jury Instr. (Cont. & Bus.)",
+        "example": "416.12",
+        "numbers": null,
+        "variants": []
+      },
+      {
+        "n": 21,
+        "name": "Florida Standard Jury Instructions, Criminal",
+        "abbr": "Fla. Std. Jury Instr. (Crim.)",
+        "example": "3.7",
+        "numbers": null,
+        "variants": []
+      },
+      {
+        "n": 22,
+        "name": "Florida Standards for Imposing Lawyer Sanctions",
+        "abbr": "Fla. Stds. Imposing Law. Sancs.",
+        "example": "9.32(a)",
+        "numbers": null,
+        "variants": []
+      },
+      {
+        "n": 23,
+        "name": "Rules of the Supreme Court Relating to Admissions to the Bar",
+        "abbr": "Fla. Bar Admiss. R.",
+        "example": "3-23.1",
+        "numbers": "^\\d+-\\d+(\\.\\d+)*",
+        "variants": []
+      }
+    ]
+  },
+  "months": {
+    "source": "Abbreviations in Rule 9.800's date parentheticals (Jan., Feb., Mar., Apr., June, Sept., Oct., Dec. all appear) and the Indigo Book's table. May, June, and July are never abbreviated.",
+    "abbr": {
+      "January": "Jan.",
+      "February": "Feb.",
+      "March": "Mar.",
+      "April": "Apr.",
+      "May": "May",
+      "June": "June",
+      "July": "July",
+      "August": "Aug.",
+      "September": "Sept.",
+      "October": "Oct.",
+      "November": "Nov.",
+      "December": "Dec."
+    }
+  },
+  "case_name_words": {
+    "source": "Indigo Book (2d ed. 2021, rev. 2023, CC0) R11.3 and Table T11, common words abbreviated in case names in citations; 'Laboratory' as Lab. per the table's own note; 'County' as Cnty., the Bluebook's form in the 21st and 22nd editions (Rule 9.800(p) sends case names to the latest Bluebook; the Indigo Book's note prefers Cty.; see references/bluebook-22-changes.md), and Florida as Fla. (Table T12; Rule 9.800's examples: 'United Faculty of Fla.'). A plural adds s to the abbreviation (Dep'ts). Never abbreviated: a geographical name that is a whole party (R11.3.2), 'Law' as a name's first word, and 'United States' as a party.",
+    "not_first": [
+      "Law"
+    ],
+    "words": {
+      "Academic": "Acad.",
+      "Academy": "Acad.",
+      "Accountancy": "Acct.",
+      "Accountant": "Acct.",
+      "Accounting": "Acct.",
+      "Administration": "Admin.",
+      "Administrative": "Admin.",
+      "Administrator": "Adm'r, Adm'x",
+      "Administratrix": "Adm'r, Adm'x",
+      "Advertising": "Advert.",
+      "Advocacy": "Advoc.",
+      "Advocate": "Advoc.",
+      "Affair": "Aff.",
+      "Africa": "Afr.",
+      "African": "Afr.",
+      "Agricultural": "Agric.",
+      "Agriculture": "Agric.",
+      "Alliance": "All.",
+      "Alternative": "Alt.",
+      "Amendment": "Amend.",
+      "America": "Am.",
+      "American": "Am.",
+      "Annual": "Ann.",
+      "Appellate": "App.",
+      "Arbitration": "Arb.",
+      "Arbitrator": "Arb.",
+      "Artificial Intelligence": "A.I.",
+      "Associate": "Assoc.",
+      "Association": "Ass'n",
+      "Atlantic": "Atl.",
+      "Attorney": "Att'y",
+      "Authority": "Auth.",
+      "Automobile": "Auto.",
+      "Automotive": "Auto.",
+      "Avenue": "Ave.",
+      "Bankruptcy": "Bankr.",
+      "Behavior": "Behav.",
+      "Behavioral": "Behav.",
+      "Board": "Bd.",
+      "Broadcaster": "Broad.",
+      "Broadcasting": "Broad.",
+      "Brotherhood": "Bhd.",
+      "Brothers": "Bros.",
+      "Building": "Bldg.",
+      "Business": "Bus.",
+      "Businesses": "Bus.",
+      "Capital": "Cap.",
+      "Casualties": "Cas.",
+      "Casualty": "Cas.",
+      "Catholic": "Cath.",
+      "Center": "Ctr.",
+      "Central": "Cent.",
+      "Centre": "Ctr.",
+      "Chemical": "Chem.",
+      "Children": "Child.",
+      "Chronicle": "Chron.",
+      "Circuit": "Cir.",
+      "Coalition": "Coal.",
+      "College": "Coll.",
+      "Commentary": "Comment.",
+      "Commission": "Comm'n",
+      "Commissioner": "Comm'r",
+      "Committee": "Comm.",
+      "Communication": "Commc'n",
+      "Community": "Cmty.",
+      "Company": "Co.",
+      "Comparative": "Compar.",
+      "Compensation": "Comp.",
+      "Computational": "Comput.",
+      "Computer": "Comput.",
+      "Computing": "Comput.",
+      "Condominium": "Condo.",
+      "Conference": "Conf.",
+      "Congress": "Cong.",
+      "Congressional": "Cong.",
+      "Consolidated": "Consol.",
+      "Construction": "Constr.",
+      "Contemporary": "Contemp.",
+      "Continental": "Cont'l",
+      "Contract": "Cont.",
+      "Conveyance": "Conv.",
+      "Conveyancer": "Conv.",
+      "Cooperation": "Coop.",
+      "Cooperative": "Coop.",
+      "Corporate": "Corp.",
+      "Corporation": "Corp.",
+      "Correctional": "Corr.",
+      "Corrections": "Corr.",
+      "Cosmetic": "Cosm.",
+      "Counseling": "Couns.",
+      "Counselor": "Couns.",
+      "Counselor's": "Couns.",
+      "Counselors": "Couns.",
+      "County": "Cnty.",
+      "Defend": "Def.",
+      "Defender": "Def.",
+      "Defense": "Def.",
+      "Defensive": "Def.",
+      "Delinquency": "Delinq.",
+      "Delinquent": "Delinq.",
+      "Department": "Dep't",
+      "Detention": "Det.",
+      "Developer": "Dev.",
+      "Development": "Dev.",
+      "Digest": "Dig.",
+      "Digital": "Digit.",
+      "Diplomacy": "Dipl.",
+      "Director": "Dir.",
+      "Discount": "Disc.",
+      "Dispute": "Disp.",
+      "Distributing": "Distrib.",
+      "Distribution": "Distrib.",
+      "Distributor": "Distrib.",
+      "District": "Dist.",
+      "Division": "Div.",
+      "Doctor": "Dr.",
+      "East": "E.",
+      "Eastern": "E.",
+      "Economic": "Econ.",
+      "Economical": "Econ.",
+      "Economics": "Econ.",
+      "Economy": "Econ.",
+      "Editor": "Ed.",
+      "Editorial": "Ed.",
+      "Educate": "Educ.",
+      "Educating": "Educ.",
+      "Education": "Educ.",
+      "Educational": "Educ.",
+      "Educator": "Educ.",
+      "Electric": "Elec.",
+      "Electrical": "Elec.",
+      "Electricity": "Elec.",
+      "Electronic": "Elec.",
+      "Employee": "Emp.",
+      "Employer": "Emp.",
+      "Employment": "Emp.",
+      "Enforcement": "Enf't",
+      "Engineer": "Eng'r",
+      "Engineering": "Eng'g",
+      "English": "Eng.",
+      "Enterprise": "Enter.",
+      "Entertainment": "Ent.",
+      "Environment": "Env't",
+      "Environmental": "Env't",
+      "Equality": "Equal.",
+      "Equipment": "Equip.",
+      "Estate": "Est.",
+      "Examiner": "Exam'r",
+      "Exchange": "Exch.",
+      "Executive": "Exec.",
+      "Executor": "Ex'[r, x]",
+      "Executrix": "Ex'[r, x]",
+      "Exploration": "Expl.",
+      "Exploratory": "Expl.",
+      "Exportation": "Exp.",
+      "Exporter": "Exp.",
+      "Faculty": "Fac.",
+      "Federal": "Fed.",
+      "Federation": "Fed'n",
+      "Fidelity": "Fid.",
+      "Finance": "Fin.",
+      "Financial": "Fin.",
+      "Financing": "Fin.",
+      "Florida": "Fla.",
+      "Fortnightly": "Fort.",
+      "Forum": "F.",
+      "Foundation": "Found.",
+      "General": "Gen.",
+      "Global": "Glob.",
+      "Government": "Gov't",
+      "Group": "Grp.",
+      "Guarantor": "Guar.",
+      "Guaranty": "Guar.",
+      "Hispanic": "Hisp.",
+      "Historical": "Hist.",
+      "History": "Hist.",
+      "Hospital": "Hosp.",
+      "Hospitality": "Hosp.",
+      "Housing": "Hous.",
+      "Human": "Hum.",
+      "Import": "Imp.",
+      "Importation": "Imp.",
+      "Importer": "Imp.",
+      "Incorporated": "Inc.",
+      "Indemnity": "Indem.",
+      "Independence": "Indep.",
+      "Independent": "Indep.",
+      "Industrial": "Indus.",
+      "Industries": "Indus.",
+      "Industry": "Indus.",
+      "Inequality": "Ineq.",
+      "Information": "Info.",
+      "Institute": "Inst.",
+      "Institution": "Inst.",
+      "Insurance": "Ins.",
+      "Intellectual": "Intell.",
+      "Intelligence": "Intel.",
+      "Interdisciplinary": "Interdisc.",
+      "Interest": "Int.",
+      "International": "Int'l",
+      "Investment": "Inv.",
+      "Investor": "Inv.",
+      "Journal": "J.",
+      "Journals": "J.",
+      "Judicial": "Jud.",
+      "Juridicial": "Jurid.",
+      "Jurisprudence": "Juris.",
+      "Justice": "Just.",
+      "Juvenile": "Juv.",
+      "Labor": "Lab.",
+      "Laboratory": "Lab.",
+      "Law": "L.",
+      "Lawyer": "Law.",
+      "Legislate": "Legis.",
+      "Legislation": "Legis.",
+      "Legislative": "Legis.",
+      "Liability": "Liab.",
+      "Librarian": "Libr.",
+      "Library": "Libr.",
+      "Limited": "Ltd.",
+      "Litigation": "Litig.",
+      "Local": "Loc.",
+      "Machine": "Mach.",
+      "Machinery": "Mach.",
+      "Magazine": "Mag.",
+      "Maintenance": "Maint.",
+      "Management": "Mgmt.",
+      "Manufacturer": "Mfr.",
+      "Manufacturing": "Mfg.",
+      "Maritime": "Mar.",
+      "Market": "Mkt.",
+      "Marketing": "Mktg.",
+      "Matrimonial": "Matrim.",
+      "Mechanic": "Mech.",
+      "Mechanical": "Mech.",
+      "Medical": "Med.",
+      "Medicinal": "Med.",
+      "Medicine": "Med.",
+      "Memorial": "Mem'l",
+      "Merchandise": "Merch.",
+      "Merchandising": "Merch.",
+      "Merchant": "Merch.",
+      "Metropolitan": "Metro.",
+      "Military": "Mil.",
+      "Mineral": "Min.",
+      "Modern": "Mod.",
+      "Mortgage": "Mortg.",
+      "Municipal": "Mun.",
+      "Municipality": "Mun.",
+      "Mutual": "Mut.",
+      "National": "Nat'l",
+      "Nationality": "Nat'y",
+      "Natural": "Nat.",
+      "Negligence": "Negl.",
+      "Negotiation": "Negot.",
+      "Negotiator": "Negot.",
+      "Newsletter": "Newsl.",
+      "North": "N.",
+      "Northeast": "Ne.",
+      "Northeastern": "Ne.",
+      "Northern": "N.",
+      "Northwest": "Nw.",
+      "Northwestern": "Nw.",
+      "Number": "No.",
+      "Office": "Off.",
+      "Official": "Off.",
+      "Opinion": "Op.",
+      "Order": "Ord.",
+      "Organization": "Org.",
+      "Organizing": "Org.",
+      "Pacific": "Pac.",
+      "Parish": "Par.",
+      "Partnership": "P'ship",
+      "Patent": "Pat.",
+      "Person": "Pers.",
+      "Personal": "Pers.",
+      "Personnel": "Pers.",
+      "Perspective": "Persp.",
+      "Pharmaceutic": "Pharm.",
+      "Pharmaceutical": "Pharm.",
+      "Philosophical": "Phil.",
+      "Philosophy": "Phil.",
+      "Planning": "Plan.",
+      "Policy": "Pol'y",
+      "Politic": "Pol.",
+      "Political": "Pol.",
+      "Politics": "Pol.",
+      "Practical": "Prac.",
+      "Practice": "Prac.",
+      "Practitioner": "Prac.",
+      "Preservation": "Pres.",
+      "Preserve": "Pres.",
+      "Privacy": "Priv.",
+      "Private": "Priv.",
+      "Probate": "Prob.",
+      "Probation": "Prob.",
+      "Problems": "Probs.",
+      "Procedure": "Proc.",
+      "Proceedings": "Proc.",
+      "Product": "Prod.",
+      "Production": "Prod.",
+      "Property": "Prop.",
+      "Protection": "Prot.",
+      "Psychological": "Psych.",
+      "Psychologist": "Psych.",
+      "Psychology": "Psych.",
+      "Public": "Pub.",
+      "Publication": "Publ'n",
+      "Publishing": "Publ'g",
+      "Quarterly": "Q.",
+      "Railroad": "R.R.",
+      "Railway": "Ry.",
+      "Record": "Rec.",
+      "Referee": "Ref.",
+      "Refinement": "Refin.",
+      "Refining": "Refin.",
+      "Regional": "Reg'l",
+      "Register": "Reg.",
+      "Regulation": "Regul.",
+      "Regulator": "Regul.",
+      "Regulatory": "Regul.",
+      "Rehabilitation": "Rehab.",
+      "Rehabilitative": "Rehab.",
+      "Relation": "Rel.",
+      "Report": "Rep.",
+      "Reproduction": "Reprod.",
+      "Reproductive": "Reprod.",
+      "Research": "Rsch.",
+      "Reservation": "Rsrv.",
+      "Reserve": "Rsrv.",
+      "Resolution": "Resol.",
+      "Resource": "Res.",
+      "Resources": "Res.",
+      "Responsibility": "Resp.",
+      "Restaurant": "Rest.",
+      "Retirement": "Ret.",
+      "Review": "Rev.",
+      "Revista": "Rev.",
+      "Rights": "Rts.",
+      "Road": "Rd.",
+      "Savings": "Sav.",
+      "School": "Sch.",
+      "Science": "Sci.",
+      "Scientific": "Sci.",
+      "Scottish": "Scot.",
+      "Secretary": "Sec'y",
+      "Securities": "Sec.",
+      "Security": "Sec.",
+      "Sentencing": "Sent'g",
+      "Service": "Serv.",
+      "Shareholder": "S'holder",
+      "Social": "Soc.",
+      "Society": "Soc'y",
+      "Sociological": "Socio.",
+      "Sociology": "Socio.",
+      "Solicitor": "Solic.",
+      "Solution": "Sol.",
+      "South": "S.",
+      "Southeast": "Se.",
+      "Southeastern": "Se.",
+      "Southern": "S.",
+      "Southwest": "Sw.",
+      "Southwestern": "Sw.",
+      "Statistic": "Stat.",
+      "Statistical": "Stat.",
+      "Statistics": "Stat.",
+      "Steamship": "S.S.",
+      "Steamships": "S.S.",
+      "Stockholder": "S'holder",
+      "Street": "St.",
+      "Studies": "Stud.",
+      "Subcommittee": "Subcomm.",
+      "Supreme Court": "Sup. Ct.",
+      "Surety": "Sur.",
+      "System": "Sys.",
+      "Systems": "Sys.",
+      "Taxation": "Tax'n",
+      "Teacher": "Tchr.",
+      "Technical": "Tech.",
+      "Technique": "Tech.",
+      "Technological": "Tech.",
+      "Technology": "Tech.",
+      "Telecommunication": "Telecomm.",
+      "Telegraph": "Tel.",
+      "Telephone": "Tel.",
+      "Temporary": "Temp.",
+      "Township": "Twp.",
+      "Transcontinental": "Transcon.",
+      "Transnational": "Transnat'l",
+      "Transport": "Transp.",
+      "Transportation": "Transp.",
+      "Tribune": "Trib.",
+      "Trust": "Tr.",
+      "Trustee": "Tr.",
+      "Turnpike": "Tpk.",
+      "Uniform": "Unif.",
+      "United States": "U.S.",
+      "University": "Univ.",
+      "Urban": "Urb.",
+      "Utility": "Util.",
+      "Village": "Vill.",
+      "Week": "Wk.",
+      "Weekly": "Wkly.",
+      "West": "W.",
+      "Western": "W.",
+      "Year Book": "Y.B.",
+      "Yearbook": "Y.B.",
+      "and": "&"
+    }
+  }
+}

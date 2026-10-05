@@ -1,0 +1,98 @@
+name: florida-citation
+
+# Public repo: Actions minutes are free, so every change runs the full matrix.
+
+on:
+  push:
+    paths: ["plugins/florida-citation/**", ".claude-plugin/**", ".github/workflows/florida-citation.yml"]
+  pull_request:
+    paths: ["plugins/florida-citation/**", ".claude-plugin/**", ".github/workflows/florida-citation.yml"]
+  schedule:
+    - cron: "41 11 * * 1"  # Mondays: a new Rule 9.800 amendment, or a court replacing an opinion
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+    working-directory: plugins/florida-citation/skills/florida-citation/scripts
+
+jobs:
+  manifests:
+    # The Claude Code marketplace and plugin manifests, and the skill itself against
+    # the Agent Skills standard.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate --strict .
+      - run: claude plugin validate --strict plugins/florida-citation
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Agent Skills standard validator (agentskills.io)
+        run: |
+          pip install "git+https://github.com/agentskills/agentskills#subdirectory=skills-ref"
+          skills-ref validate plugins/florida-citation/skills/florida-citation
+
+  offline:
+    # No network: the scripts must compile, every command must parse its arguments, and the
+    # commands that need no network must answer, on the oldest and newest supported Pythons.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m py_compile fl_cite.py fl_check.py fl_build.py fl_review.py selftest.py
+      - name: every command's --help
+        run: |
+          for cmd in rule abbrev casenum checks check build; do
+            python fl_cite.py "$cmd" --help > /dev/null
+          done
+          for t in case agency statute annotated const admin law rule ago; do
+            python fl_cite.py build "$t" --help > /dev/null
+          done
+      - name: the rule, a form, a case number, a built citation, and a checked document
+        run: |
+          python fl_cite.py rule "(b)(1)" | grep -q "DCA"
+          python fl_cite.py abbrev "judicial administration" | grep -q "Gen. Prac."
+          python fl_cite.py casenum SC09-839 | grep -q "SC2009-0839"
+          python fl_cite.py build case "Fenelon v. State" --court SC --year 1992 --cite "594 So. 2d 292" --pin 293 \
+            | grep -q "594 So. 2d 292, 293 (Fla. 1992)"
+          printf 'See Doe v. Roe, 594 So.2d 292 (Fla. 3rd DCA 1992).\n' | python fl_cite.py check - | grep -q "3d DCA"
+
+  live:
+    # The self-test: every command offline, two court opinions fetched from the Florida courts'
+    # website and checked, and CourtListener's search for new Rule 9.800 amendments. No key is
+    # needed. It fails only on FAIL; CHANGED, FLAKY, and BLOCKED are reported, not failures.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: pdftotext (Poppler), for the PDF checks
+        # Windows uses the pdftotext Git for Windows ships (Xpdf), if it is on PATH.
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            command -v pdftotext || { sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils; }
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            command -v pdftotext || brew install poppler
+          fi
+          command -v pdftotext || echo "no pdftotext; the self-test reports its PDF check as BLOCKED"
+      - name: self-test
+        run: python selftest.py

@@ -1,0 +1,435 @@
+{
+  "about": [
+    "One record per check. Every record names its authority, so every finding does.",
+    "kind 'pattern': a Python regex run on normalized text (curly quotes made straight, runs of whitespace made one space). 'fix' is a re.sub template, or null when the fix needs a fact the writer must supply. {reporter} in a pattern stands for any reporter form the checker reads (florida.json's reporter tables).",
+    "kind 'table': patterns built from a table in florida.json ('table' names it).",
+    "kind 'logic': needs dates, numbers, or the whole document; 'logic' names the function in scripts/fl_check.py that runs it.",
+    "tier 'bluebook': the check is the Bluebook system's, which 9.800(p) sends citations to; Rule 9.800 has no short forms, so Id., supra, and short case cites are checked against the Indigo Book.",
+    "kind 'none': a subdivision with nothing mechanical to check; kept so every subdivision has a record and the agent knows to judge it.",
+    "severity 'error': clearly departs from Rule 9.800's form. 'check': probably wrong, or right in some contexts; the agent decides.",
+    "examples.match must produce the finding; examples.no_match must not. Every record with examples is tested against them offline (logic records as of 2026-10-01).",
+    "summarize: true reports one finding per distinct text and fix, with a count and every location, instead of one finding per occurrence."
+  ],
+  "checks": [
+    {"id": "a-court-sup-ct", "authority": "9.800(a)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\(Fla\\. Sup(?:reme|\\.)? ?Ct\\.? ", "fix": "(Fla. ",
+     "message": "The Florida Supreme Court's parenthetical is just (Fla. year).",
+     "examples": {"match": ["594 So. 2d 292 (Fla. Sup. Ct. 1992)", "594 So. 2d 292 (Fla. Supreme Ct. 1992)"], "no_match": ["594 So. 2d 292 (Fla. 1992)"]}},
+
+    {"id": "reporter-abbreviation", "authority": "from table", "severity": "error", "kind": "table", "table": "reporters.misspellings", "summarize": true,
+     "message": "Reporter abbreviation differs from the rule's form.",
+     "examples": {"match": ["594 So.2d 292", "350 So.3d 421", "276 F. 2d 753", "313 Fed. Appx. 256", "990 F.Supp.2d 1"], "no_match": ["594 So. 2d 292", "276 F.2d 753", "313 F. App'x 256", "990 F. Supp. 2d 1", "990 F. Supp. 3d 1"]}},
+
+    {"id": "reporter-abbreviation-bluebook", "authority": "from table", "severity": "error", "kind": "table", "table": "reporters.bluebook_misspellings", "summarize": true, "tier": "bluebook",
+     "message": "Reporter abbreviation differs from the Bluebook system's form (the rule doesn't name this reporter, so 9.800(p) sends it there).",
+     "examples": {"match": ["633 N.E. 2d 764", "919 P. 2d 899", "822 S. E. 2d 281", "250 F. R. D. 120", "100 Fed.Cl. 5 (2011)"], "no_match": ["633 N.E.2d 764", "919 P.2d 899", "822 S.E.2d 281", "250 F.R.D. 120", "100 Fed. Cl. 5 (2011)", "Fla. R. Civ. P. 2d"]}},
+
+    {"id": "a-fla-reporter-court", "authority": "9.800(a)(2)", "severity": "error", "kind": "pattern",
+     "pattern": "(\\b\\d{1,3} Fla\\. \\d{1,4}(?:, \\d+)?) \\(Fla\\. (18[4-8]\\d)\\)", "fix": "\\1 (\\2)",
+     "message": "A Florida Reports cite already names the court; the parenthetical takes only the year.",
+     "examples": {"match": ["Livingston v. L'Engle, 22 Fla. 427 (Fla. 1886)."], "no_match": ["Livingston v. L'Engle, 22 Fla. 427 (1886)."]}},
+
+    {"id": "a-series-year", "authority": "9.800(a)(1)", "severity": "check", "kind": "logic", "logic": "series_year",
+     "message": "The year falls outside the reporter series' span; the series or the year is wrong.",
+     "examples": {"match": ["594 So. 3d 292 (Fla. 1992)", "160 So. 2d 1 (Fla. 2015)", "1 F.4th 100 (11th Cir. 2015)"], "no_match": ["594 So. 2d 292 (Fla. 1992)", "999 So. 2d 758 (Fla. 2009)", "1 So. 3d 1 (Fla. 2008)"]}},
+
+    {"id": "flw-exact-date", "authority": "9.800(a)(3), (b)(2), (c)", "severity": "error", "kind": "logic", "logic": "flw_exact_date",
+     "message": "A Florida Law Weekly cite takes the exact date of decision, not just the year.",
+     "examples": {"match": ["17 Fla. L. Weekly S42 (Fla. 1992)", "16 Fla. L. Weekly D1507 (Fla. 4th DCA 1991)"], "no_match": ["17 Fla. L. Weekly S42 (Fla. Jan. 16, 1992)"]}},
+
+    {"id": "flw-volume-year", "authority": "9.800(a)(3), (b)(2), (c)", "severity": "check", "kind": "logic", "logic": "flw_volume_year",
+     "message": "The Florida Law Weekly volume doesn't fit the year (main edition: volume = year - 1975, or one more for a late-year decision; Supplement: year - 1993 or year - 1992).",
+     "examples": {"match": ["19 Fla. L. Weekly S42 (Fla. Jan. 16, 1992)"], "no_match": ["17 Fla. L. Weekly S42 (Fla. Jan. 16, 1992)", "51 Fla. L. Weekly D1224 (Fla. 1st DCA June 17, 2026)", "22 Fla. L. Weekly Supp. 637 (Miami-Dade Cty. Ct. Oct. 8, 2014)"]}},
+
+    {"id": "flw-section-court", "authority": "9.800(a)(3), (b)(2)", "severity": "check", "kind": "logic", "logic": "flw_section_court",
+     "message": "The Florida Law Weekly section doesn't match the court (S = Supreme Court, D = district courts).",
+     "examples": {"match": ["16 Fla. L. Weekly S1507 (Fla. 4th DCA June 5, 1991)", "17 Fla. L. Weekly D42 (Fla. Jan. 16, 1992)"], "no_match": ["16 Fla. L. Weekly D1507 (Fla. 4th DCA June 5, 1991)"]}},
+
+    {"id": "flw-stale", "authority": "9.800(a)(3), (b)(2)", "severity": "check", "kind": "logic", "logic": "flw_stale",
+     "message": "Florida Law Weekly is cited only for cases not published in Southern Reporter, and this decision is more than a year older than the document; if it's in So. 3d now, cite that.",
+     "examples": {"match": ["Doe v. Roe, 49 Fla. L. Weekly D1234 (Fla. 2d DCA June 5, 2024)."], "no_match": ["Davis v. State, 51 Fla. L. Weekly D1224 (Fla. 1st DCA June 17, 2026).", "Maye v. State, ___ So. 3d ___, 51 Fla. L. Weekly S116 (Fla. May 14, 2026).", "Doe v. Roe, 120 So. 3d 1, 38 Fla. L. Weekly D100 (Fla. 1st DCA Jan. 2, 2013)."]}},
+
+    {"id": "flw-court-missing", "authority": "9.800(a)(3), (b)(2)", "severity": "error", "kind": "pattern",
+     "pattern": "(\\d+ Fla\\. L\\. Weekly [SD]\\d+[a-z]?(?:, [^()]*?)?) \\(((?:Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)\\.|May|June|July)", "fix": null,
+     "message": "The parenthetical needs the court: (Fla. date) for S pages, (Fla. 1st DCA date) etc. for D pages.",
+     "examples": {"match": ["49 Fla. L. Weekly S156 (June 20, 2024)"], "no_match": ["49 Fla. L. Weekly S156 (Fla. June 20, 2024)"]}},
+
+    {"id": "flw-spelling", "authority": "9.800(a)(3)", "severity": "error", "kind": "pattern",
+     "pattern": "\\b(?!Fla\\. L\\. Weekly\\b)Fla\\.? ?L(?:\\.|aw) ?W(?:ee)?kly\\.?(?= )", "fix": "Fla. L. Weekly",
+     "message": "Florida Law Weekly is abbreviated Fla. L. Weekly.",
+     "examples": {"match": ["17 Fla. L. Wkly. S42", "17 Fla.L.Weekly S42", "17 Fla. Law Weekly S42"], "no_match": ["17 Fla. L. Weekly S42"]}},
+
+    {"id": "slip-old-form", "authority": "9.800(a)(3), (b)(2)", "severity": "check", "kind": "logic", "logic": "slip_old_form",
+     "message": "Since September 1, 2026, the rule's slip-opinion examples use a four-digit year and four-digit case number.",
+     "examples": {"match": ["Medina v. State, No. SC00-280 (Fla. Mar. 14, 2002)."], "no_match": ["Medina v. State, No. SC2000-0280 (Fla. Mar. 14, 2002)."]}},
+
+    {"id": "westlaw-spacing", "summarize": true, "authority": "9.800(a)(3), (b)(2)", "severity": "error", "kind": "pattern",
+     "pattern": "\\b((?:19|20)\\d\\d) ?WL ?(?=\\d)(?<!\\d WL )", "fix": "\\1 WL ",
+     "message": "A Westlaw cite is written year WL number, with spaces.",
+     "examples": {"match": ["2024 WL2983786", "2024WL2983786", "2024WL 2983786"], "no_match": ["2024 WL 2983786"]}},
+
+    {"id": "westlaw-needs-docket", "authority": "9.800(a)(3), (b)(2)", "severity": "check", "kind": "logic", "logic": "westlaw_docket",
+     "message": "A Westlaw or LEXIS cite accompanies the slip-opinion cite: give the docket number (No. ...) before it.",
+     "examples": {"match": ["Singh v. State, 2014 WL 7463592 (Fla. Dec. 30, 2014)."], "no_match": ["Singh v. State, No. SC2010-1544, 2014 WL 7463592 (Fla. Dec. 30, 2014)."]}},
+
+    {"id": "docket-needs-no", "authority": "9.800(a)(3), (b)(2), (n)(2)", "severity": "error", "kind": "logic", "logic": "docket_no_prefix",
+     "message": "A docket number is introduced by No., as in every example the rule gives: No. SC2010-1544, 2014 WL 7463592 (Fla. Dec. 30, 2014).",
+     "examples": {"match": ["Doe v. Roe, 14-12345-CIV, 2015 WL 1234567, at *1 (S.D. Fla. Dec. 8, 2015).", "Doe v. Roe, SC2010-1544, 2014 WL 7463592 (Fla. Dec. 30, 2014)."], "no_match": ["Doe v. Roe, No. 14-12345-CIV, 2015 WL 1234567, at *1 (S.D. Fla. Dec. 8, 2015).", "Doe v. Roe, No. SC2010-1544, 2014 WL 7463592 (Fla. Dec. 30, 2014)."]}},
+
+    {"id": "docket-court-mismatch", "authority": "9.800(a)(3), (b)(2)", "severity": "check", "kind": "logic", "logic": "docket_court",
+     "message": "The docket number's court prefix doesn't match the court in the parenthetical.",
+     "examples": {"match": ["No. 2D2014-2438, 2014 WL 3418358 (Fla. 4th DCA June 12, 2014)"], "no_match": ["No. 2D2014-2438, 2014 WL 3418358 (Fla. 2d DCA June 12, 2014)"]}},
+
+    {"id": "b-dca-ordinal", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\b([23])(?:nd|rd) DCA\\b", "fix": "\\1d DCA",
+     "message": "The rule writes 2d and 3d, not 2nd and 3rd.",
+     "examples": {"match": ["(Fla. 3rd DCA 1988)", "(Fla. 2nd DCA 1988)"], "no_match": ["(Fla. 3d DCA 1988)", "(Fla. 2d DCA 1988)"]}},
+
+    {"id": "b-dca-periods", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\b(\\d(?:st|d|nd|rd|th)) D\\. ?C\\. ?A\\.", "fix": "\\1 DCA",
+     "message": "The rule writes DCA without periods.",
+     "examples": {"match": ["(Fla. 3d D.C.A. 1988)", "(Fla. 1st D. C. A. 1990)"], "no_match": ["(Fla. 3d DCA 1988)"]}},
+
+    {"id": "b-dca-no-fla", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\(((?:1st|2d|3d|4th|5th|6th) DCA)", "fix": "(Fla. \\1",
+     "message": "A district court's parenthetical starts with Fla.",
+     "examples": {"match": ["533 So. 2d 935 (3d DCA 1988)"], "no_match": ["533 So. 2d 935 (Fla. 3d DCA 1988)"]}},
+
+    {"id": "court-period", "authority": "9.800(a)(1), (b)(1), (m)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\((Fla|\\d{1,2}(?:st|nd|rd|d|th) Cir)(?= )", "fix": "(\\1.",
+     "message": "The court abbreviation ends with a period: (Fla. 1992), (Fla. 6th DCA 2024), (11th Cir. 2009).",
+     "examples": {"match": ["43 So. 3d 45 (Fla 2010)", "(Fla 6th DCA 2024)", "1999 WL 162955 (4th Cir 1999)"], "no_match": ["43 So. 3d 45 (Fla. 2010)", "(4th Cir. 1999)", "(Fla.)"]}},
+
+    {"id": "b-dca-missing", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\(Fla\\. (1st|2d|2nd|3d|3rd|4th|5th|6th)(?= (?:[A-Z][a-z]{2,4}\\.? \\d{1,2}, )?(?:1[89]|20)\\d\\d\\))", "fix": "(Fla. \\1 DCA",
+     "message": "A district court's parenthetical names the court as DCA: (Fla. 2d DCA 2020).",
+     "examples": {"match": ["Doe v. Roe, 300 So. 3d 100, 102 (Fla. 2d 2020)", "(Fla. 4th Mar. 6, 2002)"], "no_match": ["(Fla. 2d DCA 2020)", "(Fla. 2020)", "811 So. 2d 822 (Fla. 1st DCA 2002)"]}},
+
+    {"id": "b-dca-glued", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern", "summarize": true,
+     "pattern": "\\b(1st|2d|2nd|3d|3rd|4th|5th|6th)(DCA)\\b", "fix": "\\1 \\2",
+     "message": "A space separates the district from DCA: (Fla. 4th DCA 2010).",
+     "examples": {"match": ["(Fla. 4thDCA 2010)", "60 So. 3d 100 (Fla. 2dDCA 2010)"], "no_match": ["(Fla. 4th DCA 2010)"]}},
+
+    {"id": "b-west-district", "authority": "9.800(b)(1)", "severity": "error", "kind": "logic", "logic": "west_dca",
+     "message": "Name the district court as the rule does: (Fla. 4th DCA 2012), not Westlaw's (Fla. App. 4th Dist. 2012) or (Fla.App. 4 Dist. 2012).",
+     "examples": {"match": ["Doe v. Roe, 100 So. 3d 1 (Fla. App. 4th Dist. 2012).", "Doe v. Roe, 500 So. 2d 1 (Fla.App. 3 Dist. 1988)."], "no_match": ["Doe v. Roe, 100 So. 3d 1 (Fla. 4th DCA 2012).", "Doe v. Roe, 500 So. 2d 1 (Fla. Dist. Ct. App. 1988)."]}},
+
+    {"id": "f-name-first", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFlorida Statutes?,? ?(?:[Ss]ection|§) ?(\\d+\\.\\d+(?:\\([\\w]+\\))*)", "fix": "section \\1, Florida Statutes",
+     "message": "Florida's form puts the section first: section 48.031, Florida Statutes, in a sentence; § 48.031, Fla. Stat., standing alone.",
+     "examples": {"match": ["under Florida Statute Section 48.031, service was", "as Florida Statute § 48.031(1) provides", "as Florida Statute§ 48.031(1) provides"], "no_match": ["section 48.031, Florida Statutes", "the Florida Statutes provide"]}},
+
+    {"id": "court-unreadable", "authority": "9.800(b)(1)", "severity": "check", "kind": "logic", "logic": "court_unreadable",
+     "message": "The district in the parenthetical isn't one Rule 9.800 names: a typo, or an OCR misreading ('Ist' for '1st', 'Sth' for '5th').",
+     "examples": {"match": ["Parker v. State, 362 So. 2d 1033 (Fla. Ist DCA 1978)."], "no_match": ["Parker v. State, 362 So. 2d 1033 (Fla. 1st DCA 1978)."]}},
+
+    {"id": "b-bluebook-court", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\(Fla\\. ?(?:Dist\\. ?Ct\\. ?)?App\\. (\\d{4})\\)", "fix": null,
+     "message": "Florida's form names the district: (Fla. 3d DCA 1988). Which district is a fact to look up.",
+     "examples": {"match": ["(Fla. Dist. Ct. App. 1988)", "(Fla. App. 1988)"], "no_match": ["(Fla. 3d DCA 1988)", "(Fla.App. 3 Dist. 1988)"]}},
+
+    {"id": "b-no-year", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\(Fla\\. (?:1st|2d|3d|4th|5th|6th) DCA\\)", "fix": null,
+     "message": "The parenthetical needs the year of decision.",
+     "examples": {"match": ["533 So. 2d 935 (Fla. 3d DCA)."], "no_match": ["533 So. 2d 935 (Fla. 3d DCA 1988)."]}},
+
+    {"id": "b-court-before-it-existed", "authority": "9.800(b)(1)", "severity": "check", "kind": "logic", "logic": "court_began",
+     "message": "The court didn't exist yet in that year (Fourth DCA 1965, Fifth DCA 1979, Sixth DCA January 1, 2023; Eleventh Circuit October 1, 1981).",
+     "examples": {"match": ["280 So. 3d 100 (Fla. 6th DCA 2019)", "500 F.2d 100 (11th Cir. 1975)"], "no_match": ["380 So. 3d 100 (Fla. 6th DCA 2024)", "500 F.2d 100 (5th Cir. 1975)"]}},
+
+    {"id": "date-on-reported", "authority": "9.800(a)(1), (b)(1), (l)(1), (m)(1), (n)(1)", "severity": "error", "kind": "logic", "logic": "date_on_reported",
+     "message": "A case published in a reporter gives only the year; the exact date is for slip opinions and online or Florida Law Weekly cites.",
+     "examples": {"match": ["Doe v. Roe, 500 F. Supp. 3d 100, 105 (S.D. Fla. Feb. 3, 2021)."], "no_match": ["Doe v. Roe, 500 F. Supp. 3d 100, 105 (S.D. Fla. 2021).", "Doe v. Roe, ___ F. Supp. 3d ___, 2021 WL 123456 (S.D. Fla. Feb. 3, 2021).", "Doe v. Roe, 300 So. 3d 100, 45 Fla. L. Weekly D10 (Fla. 1st DCA Jan. 2, 2020)."]}},
+
+    {"id": "c-judicial-circuit", "authority": "9.800(c)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\(Fla\\. (\\d+(?:st|nd|d|rd|th)) Jud(?:icial|\\.)? Cir(?:cuit|\\.)?(?: Ct\\.)? ", "fix": "(Fla. \\1 Cir. Ct. ",
+     "message": "A circuit court's parenthetical is (Fla. 17th Cir. Ct. date).",
+     "examples": {"match": ["(Fla. 17th Jud. Cir. Feb. 13, 2010)", "(Fla. 9th Judicial Circuit Dec. 9, 1996)"], "no_match": ["(Fla. 17th Cir. Ct. Feb. 13, 2010)"]}},
+
+    {"id": "c-county-court", "authority": "9.800(c)(2)", "severity": "error", "kind": "pattern",
+     "pattern": "(?<=\\()([A-Z][A-Za-z.\\-]+(?: [A-Z][A-Za-z.\\-]+)?) (?:County|Cnty\\.) (?:Ct\\.|Court) ", "fix": "\\1 Cty. Ct. ",
+     "message": "A county court's parenthetical is (Miami-Dade Cty. Ct. date).",
+     "examples": {"match": ["(Miami-Dade County Ct. Oct. 8, 2014)", "(Palm Beach Cnty. Ct. Oct. 8, 2014)"], "no_match": ["(Miami-Dade Cty. Ct. Oct. 8, 2014)"]}},
+
+    {"id": "month-abbreviation", "authority": "9.800 (date parentheticals); Indigo Book", "severity": "error", "kind": "table", "table": "months",
+     "message": "Months are abbreviated in a date parenthetical (May, June, and July are not).",
+     "examples": {"match": ["(Miami-Dade Cty. Ct. August 27, 2024)", "(Fla. 1st DCA September 2, 2026)", "(Fla. Sep. 2, 2026)"], "no_match": ["(Miami-Dade Cty. Ct. Aug. 27, 2024)", "(Fla. June 20, 2024)", "(Fla. Sept. 2, 2026)", "Fla. S. Comm. on Crim. Just., SB 2, Staff Analysis (March 19, 2007)"]}},
+
+    {"id": "d-doah-no-fla", "authority": "9.800(d)(2)", "severity": "error", "kind": "pattern",
+     "pattern": "\\(DOAH ", "fix": "(Fla. DOAH ",
+     "message": "A DOAH parenthetical starts with Fla.: (Fla. DOAH date).",
+     "examples": {"match": ["No. 13-4478PL (DOAH Oct. 15, 2014)"], "no_match": ["No. 13-4478PL (Fla. DOAH Oct. 15, 2014)"]}},
+
+    {"id": "d-doah-order-type", "authority": "9.800(d)(2)", "severity": "check", "kind": "pattern",
+     "pattern": "\\(Fla\\. DOAH (?:(?:Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)\\.|May|June|July) \\d{1,2}, \\d{4}\\)(?! \\((?:Recommended|Final|Summary Final) Order)", "fix": null,
+     "message": "The rule's DOAH form adds the order type after the date, e.g. (Recommended Order).",
+     "examples": {"match": ["No. 13-4478PL (Fla. DOAH Oct. 15, 2014)."], "no_match": ["No. 13-4478PL (Fla. DOAH Oct. 15, 2014) (Recommended Order)."]}},
+
+    {"id": "d-agency-orders", "authority": "9.800(d)(1), (3), (4)", "severity": "check", "kind": "none",
+     "message": "Agency final orders, subsequent agency and court history, and the agency reporters (F.C.S.R., F.P.E.R., F.P.S.C.) have forms too varied to check mechanically; compare them with the rule's examples.",
+     "examples": {"match": [], "no_match": []}},
+
+    {"id": "e-bluebook-order", "authority": "9.800(e)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFla\\. Const\\. art\\. ([IVXL]+), § ?(\\d+(?:\\([a-z0-9]+\\))*)", "fix": "Art. \\1, § \\2, Fla. Const.",
+     "message": "Florida's form puts the article and section first: Art. V, § 3(b)(3), Fla. Const.",
+     "examples": {"match": ["Fla. Const. art. V, § 3(b)(3)."], "no_match": ["Art. V, § 3(b)(3), Fla. Const."]}},
+
+    {"id": "e-name-first", "authority": "9.800(e)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFlorida Constitution,? ?[Aa]rt(?:icle|\\.) ?([IVX]+),? ?(?:§|[Ss]ec(?:tion|\\.)) ?(\\d+(?:\\(\\w+\\))*)(?!(?:\\(\\w+\\))*,? Fla\\. Const)", "fix": "article \\1, section \\2 of the Florida Constitution",
+     "message": "Florida's form puts the article and section first: article IV, section 8 of the Florida Constitution in a sentence; Art. IV, § 8, Fla. Const., standing alone.",
+     "examples": {"match": ["falls under the Florida Constitution Article IV, § 8.", "under Florida Constitution, Art. I, Section 9(a)"], "no_match": ["article IV, section 8 of the Florida Constitution", "Art. IV, § 8, Fla. Const.", "Florida Constitution Art. IV, § 8, Fla. Const......12"]}},
+
+    {"id": "section-sign-space", "summarize": true, "authority": "9.800(e), (f) (examples); Indigo Book", "severity": "check", "kind": "pattern",
+     "pattern": "(§§?)(?=\\d)", "fix": "\\1 ",
+     "message": "A space follows the section sign (§ 48.031). Rule 9.800(j)(17)'s own example omits it, so this is a check.",
+     "examples": {"match": ["Art. V, §3(b)(3), Fla. Const.", "§48.031, Fla. Stat. (2014)"], "no_match": ["Art. V, § 3(b)(3), Fla. Const."]}},
+
+    {"id": "e-historical-year", "authority": "9.800(e)(2)", "severity": "check", "kind": "none",
+     "message": "A repealed, superseded, or amended constitutional provision takes the year of the version cited; whether a provision has changed is a fact to look up.",
+     "examples": {"match": [], "no_match": []}},
+
+    {"id": "f-bluebook-order-year", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFla\\. Stat\\. (?:§ ?)?(\\d+\\.\\d+[\\w()]*) \\(((?:Supp\\. )?\\d{4})\\)", "fix": "§ \\1, Fla. Stat. (\\2)",
+     "message": "Florida's form puts the section first: § 48.031, Fla. Stat. (2014).",
+     "examples": {"match": ["Fla. Stat. § 48.031 (2014).", "Fla. Stat. 48.031 (2014)."], "no_match": ["§ 48.031, Fla. Stat. (2014).", "7 Fla. Stat. Ann. § 95.11 (2017)."]}},
+
+    {"id": "f-bluebook-order", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFla\\. Stat\\. (?:§ ?)?(\\d+\\.\\d+(?:\\([\\w]+\\))*)(?![\\w]|\\.\\w| \\(|\\([\\w]+\\))", "fix": "§ \\1, Fla. Stat.",
+     "message": "Florida's form puts the section first: § 48.031, Fla. Stat. (year).",
+     "examples": {"match": ["set forth in Fla. Stat. § 70.51(23), and", "giving Plaintiff standing under Fla. Stat. 64.031. Problematically,", "See Fla. Stat. 689.15; Aderhold v. Aderhold", "Fla. Stat. § 48.031(1)(emphasis added)."], "no_match": ["§ 70.51(23), Fla. Stat.", "Fla. Stat. § 48.031 (2014)", "Fla. Stat. (2014)", "Fla. Stat. § 689.15(2)(a) (2020)"]}},
+
+    {"id": "f-fs", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bF\\. ?S\\.(?![\\w.])(?! ?A\\.)", "fix": null,
+     "message": "Write § 48.031, Fla. Stat. (year) standing alone, or section 48.031, Florida Statutes (year), in a sentence.",
+     "examples": {"match": ["F.S. 48.031", "Section 48.031, F.S."], "no_match": ["Fla. Stat.", "F.S.A."]}},
+
+    {"id": "f-no-comma", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "(§ \\d+\\.\\d+(?:\\([\\w]+\\))*) Fla\\. Stat\\.", "fix": "\\1, Fla. Stat.",
+     "message": "A comma separates the section from Fla. Stat.",
+     "examples": {"match": ["§ 48.031 Fla. Stat. (2014).", "§ 70.51 Fla. Stat., or"], "no_match": ["§ 48.031, Fla. Stat. (2014)."]}},
+
+    {"id": "f-stat-period", "summarize": true, "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFla\\. Stat(?![.\\w])", "fix": "Fla. Stat.",
+     "message": "Fla. Stat. ends with a period.",
+     "examples": {"match": ["§ 316.193, Fla. Stat (2023)"], "no_match": ["§ 316.193, Fla. Stat. (2023)", "Fla. Stats."]}},
+
+    {"id": "f-year-missing", "authority": "9.800(f)(1)", "severity": "check", "kind": "logic", "logic": "statute_year_summary",
+     "message": "Statute cites without the year of the edition. Courts often omit it for current law; add it where the version matters, such as a statute amended since the events. Reported once per document.",
+     "examples": {"match": ["§ 48.031, Fla. Stat."], "no_match": ["§ 48.031, Fla. Stat. (2014)."]}},
+
+    {"id": "f-future-year", "authority": "9.800(f)(1)", "severity": "check", "kind": "logic", "logic": "statute_future_year",
+     "message": "The statute edition is dated after the document.",
+     "examples": {"match": ["§ 48.031, Fla. Stat. (2027)."], "no_match": ["§ 48.031, Fla. Stat. (2026).", "§ 48.031, Fla. Stat."]}},
+
+    {"id": "g-annotated-volume", "authority": "9.800(g)(1)", "severity": "check", "kind": "pattern",
+     "pattern": "(?<![\\d] )\\bFla\\. Stat\\. Ann\\. §", "fix": null,
+     "message": "Florida Statutes Annotated cites lead with the volume number and name no publisher: 7 Fla. Stat. Ann. § 95.11 (2017).",
+     "examples": {"match": ["Fla. Stat. Ann. § 95.11 (West 2017)."], "no_match": ["7 Fla. Stat. Ann. § 95.11 (2017)."]}},
+
+    {"id": "f-annotated-order", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "(§§? ?\\d+[A-Z]?\\.\\d+[\\w()]*),? Fla\\. Stat\\. Ann\\.", "fix": "\\1, Fla. Stat.",
+     "message": "Cite Florida Statutes to the official statutes, section first: § 48.031, Fla. Stat. (year). If the annotated volumes are meant, Rule 9.800(g) leads with the volume: 7 Fla. Stat. Ann. § 95.11 (2017).",
+     "examples": {"match": ["under § 48.031, Fla. Stat. Ann., a party", "§ 48.035(5), Fla. Stat. Ann. The"], "no_match": ["7 Fla. Stat. Ann. § 95.11 (2017).", "§ 48.031, Fla. Stat. (2014)."]}},
+
+    {"id": "g-annotated-pages", "authority": "9.800(g)(2)", "severity": "check", "kind": "none",
+     "message": "Material other than a statute section (notes, commentary) is cited by volume and page: 30 Fla. Stat. Ann. 69-70 (2004).",
+     "examples": {"match": [], "no_match": []}},
+
+    {"id": "h-admin-code-r", "authority": "9.800(h)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFla\\. Admin\\. Code (?:Ann\\. )?(?:r\\. ?)?(?=\\d)", "fix": "Fla. Admin. Code R. ",
+     "message": "The rule's form is Fla. Admin. Code R. 62D-2.014.",
+     "examples": {"match": ["Fla. Admin. Code 62D-2.014.", "Fla. Admin. Code r. 62D-2.014.", "Fla. Admin. Code Ann. r. 62D-2.014."], "no_match": ["Fla. Admin. Code R. 62D-2.014."]}},
+
+    {"id": "h-fac", "authority": "9.800(h)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\b(?:[Rr]ule )?(\\d+[A-Z]{0,2}-\\d+\\.\\d+), F\\. ?A\\. ?C\\.(?!\\w)", "fix": "Fla. Admin. Code R. \\1",
+     "message": "The rule's form is Fla. Admin. Code R. 62D-2.014.",
+     "examples": {"match": ["Rule 62D-2.014, F.A.C.", "rule 28-106.201, F.A.C."], "no_match": ["Fla. Admin. Code R. 62D-2.014."]}},
+
+    {"id": "h-historical-year", "authority": "9.800(h)(2)", "severity": "check", "kind": "none",
+     "message": "A repealed, superseded, or amended administrative rule takes the year of the version cited; whether it has changed is a fact to look up.",
+     "examples": {"match": [], "no_match": []}},
+
+    {"id": "i-bluebook-order-section", "authority": "9.800(i)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bLaws of Fla\\. ch\\. (\\d+-\\d+), (§ \\d+)", "fix": "Ch. \\1, \\2, Laws of Fla.",
+     "message": "Florida's form is Ch. 74-177, § 5, Laws of Fla.",
+     "examples": {"match": ["Laws of Fla. ch. 74-177, § 5."], "no_match": ["Ch. 74-177, § 5, Laws of Fla."]}},
+
+    {"id": "i-bluebook-order", "authority": "9.800(i)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bLaws of Fla\\. ch\\. (\\d+-\\d+)(?!\\d|, §)", "fix": "Ch. \\1, Laws of Fla.",
+     "message": "Florida's form is Ch. 74-177, Laws of Fla.",
+     "examples": {"match": ["Laws of Fla. ch. 2014-17."], "no_match": ["Ch. 2014-17, Laws of Fla.", "Laws of Fla. ch. 74-177, § 5."]}},
+
+    {"id": "i-pre1957-year", "authority": "9.800(i)(2)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bCh\\. \\d{3,5}, (?:§ \\d+, )?Laws of Fla\\.(?! \\(\\d{4}\\))", "fix": null,
+     "message": "Laws before 1957 (chapter numbers without a year prefix) take the year: Ch. 22000, Laws of Fla. (1943).",
+     "examples": {"match": ["Ch. 22000, Laws of Fla."], "no_match": ["Ch. 22000, Laws of Fla. (1943).", "Ch. 74-177, § 5, Laws of Fla."]}},
+
+    {"id": "j-rule-set-name", "authority": "9.800(j)", "severity": "error", "kind": "table", "table": "rule_sets.variants",
+     "message": "Rule-set abbreviation differs from the rule's form (9.800(j) lists all 23).",
+     "examples": {"match": ["Fla. R. App. Pro. 9.100", "Fla.R.Civ.P. 1.180", "Fla. R. Jud. Admin. 2.420", "Fla. Fam. Law R. P. 12.010"], "no_match": ["Fla. R. App. P. 9.100", "Fla. R. Civ. P. 1.180", "Fla. R. Gen. Prac. & Jud. Admin. 2.420", "Fla. Fam. L. R. P. 12.010", "In re Amends to Fla. R. Civ. Pro. 1.510, 309 So. 3d 192"]}},
+
+    {"id": "j-rule-set-number", "authority": "9.800(j)", "severity": "check", "kind": "logic", "logic": "rule_set_number",
+     "message": "The rule number doesn't belong to that rule set (civil rules are 1.xxx, criminal 3.xxx, appellate 9.xxx, and so on).",
+     "examples": {"match": ["Fla. R. Civ. P. 3.850", "Fla. R. App. P. 1.180"], "no_match": ["Fla. R. Crim. P. 3.850", "Fla. R. App. P. 9.100"]}},
+
+    {"id": "j-jury-instr-section", "authority": "9.800(j)(19)-(21)", "severity": "error", "kind": "pattern",
+     "pattern": "(Fla\\. Std\\. Jury Instr\\. \\([^)]+\\)) § ?", "fix": "\\1 ",
+     "message": "Standard jury instructions are cited by number without a section sign: Fla. Std. Jury Instr. (Crim.) 3.7.",
+     "examples": {"match": ["Fla. Std. Jury Instr. (Crim.) § 3.7."], "no_match": ["Fla. Std. Jury Instr. (Crim.) 3.7."]}},
+
+    {"id": "j-historical-year", "authority": "9.800(j)", "severity": "check", "kind": "none",
+     "message": "A repealed, superseded, or amended rule takes the year of the version cited; whether a rule has changed is a fact to look up.",
+     "examples": {"match": [], "no_match": []}},
+
+    {"id": "k-ag-opinion", "authority": "9.800(k)", "severity": "error", "kind": "logic", "logic": "ag_opinion",
+     "message": "Florida Attorney General opinions are cited Op. Att'y Gen. Fla. 73-178 (1973).",
+     "examples": {"match": ["AGO 73-178.", "Fla. Op. Att'y Gen. 73-178 (1973).", "Op. Att'y Gen. Fla. 73-178."], "no_match": ["Op. Att'y Gen. Fla. 73-178 (1973)."]}},
+
+    {"id": "l-court-in-paren", "authority": "9.800(l)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "(\\b\\d+ U\\.S\\. \\d+(?:, \\d+(?:-\\d+)?)?) \\(U\\.S\\. (\\d{4})\\)", "fix": "\\1 (\\2)",
+     "message": "A U.S. Reports cite already names the court; the parenthetical takes only the year.",
+     "examples": {"match": ["380 U.S. 343 (U.S. 1965)", "380 U.S. 343, 350 (U.S. 1965)"], "no_match": ["380 U.S. 343 (1965)", "No. 17-387 (U.S. May 21, 2018)"]}},
+
+    {"id": "l-sct-without-us", "authority": "9.800(l)(2)", "severity": "check", "kind": "logic", "logic": "sct_without_us",
+     "message": "Cite United States Reports when the case is published there; the U.S. cite is a fact to look up.",
+     "examples": {"match": ["Sansone v. United States, 85 S. Ct. 1004 (1965)."], "no_match": ["Sansone v. United States, 380 U.S. 343 (1965).", "Doe v. Roe, 146 S. Ct. 100 (2026)."]}},
+
+    {"id": "m-no-court", "authority": "9.800(m)(1)", "severity": "error", "kind": "logic", "logic": "federal_no_court",
+     "message": "A federal appellate or district cite needs the court in the parenthetical: (5th Cir. 1960), (S.D. Fla. 1971).",
+     "examples": {"match": ["276 F.2d 753 (1960)", "332 F. Supp. 1107 (1971)"], "no_match": ["276 F.2d 753 (5th Cir. 1960)"]}},
+
+    {"id": "m-west-circuit", "authority": "9.800(m)(1)", "severity": "error", "kind": "logic", "logic": "west_circuit",
+     "message": "Name the circuit as the rule does: (5th Cir. 1960), not West's (C.A.5 1960) or (5th Cir. Fla. 1960).",
+     "examples": {"match": ["276 F.2d 753 (C.A.5 1960)", "276 F.2d 753 (C.A. 11 2009)", "856 F.2d 167, 169 (11th Cir. Ga. 1988)"], "no_match": ["276 F.2d 753 (5th Cir. 1960)"]}},
+
+    {"id": "n-district-form", "authority": "9.800(n)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\((?!(?:N|S|M)\\.D\\. Fla\\. )(N|S|M)\\.? ?D\\.? ?Fla\\.?(?= )", "fix": "(\\1.D. Fla.",
+     "message": "Florida's federal districts are (N.D. Fla. year), (M.D. Fla. year), (S.D. Fla. year).",
+     "examples": {"match": ["332 F. Supp. 1107 (S.D.Fla. 1971)", "332 F. Supp. 1107 (SD Fla 1971)"], "no_match": ["332 F. Supp. 1107 (S.D. Fla. 1971)"]}},
+
+    {"id": "o-bluebook-order-amend", "authority": "9.800(o)(2)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bU\\.S\\. Const\\. amend\\. ([IVXL]+)\\b", "fix": "Amend. \\1, U.S. Const.",
+     "message": "Florida's form puts the amendment first: Amend. V, U.S. Const.",
+     "examples": {"match": ["U.S. Const. amend. V."], "no_match": ["Amend. V, U.S. Const."]}},
+
+    {"id": "o-bluebook-order-art", "authority": "9.800(o)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bU\\.S\\. Const\\. art\\. ([IVX]+), § ?(\\d+), cl\\. (\\d+)", "fix": "Art. \\1, § \\2, cl. \\3, U.S. Const.",
+     "message": "Florida's form puts the article first: Art. IV, § 2, cl. 2, U.S. Const.",
+     "examples": {"match": ["U.S. Const. art. IV, § 2, cl. 2."], "no_match": ["Art. IV, § 2, cl. 2, U.S. Const."]}},
+
+    {"id": "signal-capital", "authority": "Indigo Book R4.5", "severity": "error", "kind": "logic", "logic": "signal_capital",
+     "message": "A signal is capitalized only when it begins a citation sentence; after a semicolon inside one, it's lowercase.",
+     "examples": {"match": ["Fla. R. Civ. P. 1.110(b); See also Smith v. Jones, 700 So. 2d 100, 102 (Fla. 1st DCA 1997)."], "no_match": ["Fla. R. Civ. P. 1.110(b); see also Smith v. Jones, 700 So. 2d 100, 102 (Fla. 1st DCA 1997).", "The order is final; See the docket for the rest."]}},
+
+    {"id": "record-cite-form", "authority": "Indigo Book R26, R5.3", "severity": "check", "kind": "logic", "logic": "record_cite_form",
+     "message": "Record citations: several paragraphs take ¶¶ (as several sections take §§, Indigo Book R5.2.3; Bluebook R3.3(b)); Id. isn't used for record citations (R26); and where it is, a paragraph pinpoint takes ¶ with no \"at\" (R5.3). A court's own rules on citing the record govern over these. Reported once per document.",
+     "examples": {"match": ["The parties disagree. Smith Aff. ¶ 8, 12. They still do.", "The freeze bounced checks. Smith Aff. ¶ 78. It hurt the business. Id. at 79."], "no_match": ["The parties disagree. Smith Aff. ¶¶ 8, 12. They still do.", "See Smith v. Jones, 700 So. 2d 100, 102 (Fla. 1997). Id. at 103."]}},
+
+    {"id": "ellipsis-form", "summarize": true, "authority": "Indigo Book R8.3.1", "severity": "error", "kind": "logic", "logic": "ellipsis_form",
+     "message": "An ellipsis is three periods with a space before, between, and after each: . . . (four at the end of a sentence: . . . .).",
+     "examples": {"match": ["The court must resolve \"all reasonable doubts ... in her favor.\" Able v. Baker, 850 F.2d 300, 302 (11th Cir. 1988)."], "no_match": ["The court must resolve \"all reasonable doubts . . . in her favor.\" Able v. Baker, 850 F.2d 300, 302 (11th Cir. 1988)."]}},
+
+    {"id": "spelled-out-in-sentence", "authority": "9.800 (introductory paragraph)", "severity": "check", "kind": "logic", "logic": "in_sentence",
+     "message": "Citation forms (other than case reporters) are spelled out when they are an integral part of a sentence; whether one is takes judgment.",
+     "examples": {"match": ["Under Art. V, § 3(b)(3), Fla. Const., the Court may review the decision."], "no_match": ["Article V, section 3(b)(3) of the Florida Constitution sets out the Court's jurisdiction."]}},
+
+    {"id": "p-other-citations", "authority": "9.800(p)", "severity": "check", "kind": "none",
+     "message": "Citations the rule doesn't cover follow the Bluebook (checked here through the Indigo Book), then the Florida Style Manual for Florida materials neither covers (bills, staff analyses, legislative journals, executive orders).",
+     "examples": {"match": [], "no_match": []}},
+
+    {"id": "q-case-name-typeface", "authority": "9.800(q)", "severity": "check", "kind": "logic", "logic": "case_name_typeface", "summarize": false,
+     "message": "Case names are underscored or italicized. Checkable only in .docx; PDF text loses typeface.",
+     "examples": {"match": [], "no_match": []}},
+
+    {"id": "short-form-year", "authority": "Indigo Book R15.2.2", "severity": "check", "kind": "pattern", "tier": "bluebook",
+     "pattern": "(\\b\\d{1,4} (?:U\\.S\\.|S\\. ?Ct\\.|L\\. ?Ed\\. ?2d|So\\.(?: ?[23]d)?|F\\.(?:[234]d|4th)|F\\. ?Supp\\.(?: ?[23]d)?|F\\. App'x|Fla\\.) at \\d+(?:[-–]\\d+)?) \\((?:1[789]|20)\\d\\d\\)", "fix": "\\1",
+     "message": "A short form gives no year; the full citation already has it: Fenelon, 594 So. 2d at 293.",
+     "examples": {"match": ["Harris, 550 U.S. at 381 (2007);", "Fenelon, 594 So. 2d at 293 (1992)."], "no_match": ["Harris, 550 U.S. at 381.", "2014 WL 7463592, at *3 (Fla. 2014)", "Harris v. Doe, 550 U.S. 372, 381 (2007)"]}},
+
+    {"id": "pin-comma-space", "summarize": true, "authority": "Indigo Book R11.1", "severity": "error", "kind": "pattern", "tier": "bluebook",
+     "pattern": "(\\b\\d{1,4} (?:{reporter}) \\d{1,5}),(\\d{1,5})\\b", "fix": "\\1, \\2",
+     "message": "A comma and a space come before the pinpoint: 594 So. 2d 292, 293. In OCR'd text, compare the original; the space may have been lost in scanning.",
+     "examples": {"match": ["594 So. 2d 292,293 (Fla. 1992)", "700 F. App'x 100,104 (11th Cir. 2017)", "300 N.E.2d 5,7 (Mass. 1973)"], "no_match": ["594 So. 2d 292, 293 (Fla. 1992)", "§ 48.031,2"]}},
+
+    {"id": "year-space", "summarize": true, "authority": "9.800(a)(1), (b)(1), (c), (l)(1), (m)(1), (n)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "(\\((?:[^()]{0,60}? )?(?:[A-Z][A-Za-z.]*\\.|DCA))((?:1[6-9]|20)\\d\\d\\))", "fix": "\\1 \\2",
+     "message": "A space comes before the year in a court's date parenthetical: (Fla. 1992), (11th Cir. 2012). In OCR'd text, compare the original; the space may have been lost in scanning.",
+     "examples": {"match": ["Doe v. Roe, 594 So. 2d 292 (Fla.1992).", "Doe v. Roe, 700 F.3d 100 (11th Cir.2012).", "Doe v. Roe, 500 F. Supp. 2d 100 (S.D. Fla.2007).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA1983)."], "no_match": ["Doe v. Roe, 594 So. 2d 292 (Fla. 1992).", "Doe v. Roe, 40 So. 100 (1928).", "Doe v. Roe, 815 So. 2d 100 (Fla. 3d DCA Mar. 6,2002).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA 1983)."]}},
+
+    {"id": "paren-unbalanced", "authority": "9.800", "severity": "check", "kind": "logic", "logic": "paren_unbalanced",
+     "message": "The parentheses in this citation don't pair, so a parenthetical or subsection may be cut off or run on; check where each one should close.",
+     "examples": {"match": ["Doe v. Roe, 600 So. 2d 10 (Fla. 1995)); Ames v. Bell, 700 So. 2d 20 (Fla. 1997).", "See Fla. Stat. § 48.031(2(b)).", "Doe v. Roe, 600 So. 2d 10 (Fla. 1995) (holding that notice is required. The court agreed."], "no_match": ["Doe v. Roe, 600 So. 2d 10 (Fla. 1995) (citing Ames v. Bell, 700 So. 2d 20 (Fla. 1997)).", "The rule is settled (see Doe v. Roe, 600 So. 2d 10 (Fla. 1995)).", "§ 48.031(1)(a), Fla. Stat. (2014).", "Doe v. Roe, 600 So. 2d 10 (Fla. 1995) (explaining that \"the rule (as amended governs\")."]}},
+
+    {"id": "quote-unclosed", "authority": "Indigo Book R8.1", "severity": "check", "kind": "logic", "logic": "quote_unclosed", "tier": "bluebook",
+     "message": "A quotation opens here and never closes, so where it ends, and whether the citation after it is quoted or the writer's own, is unclear; add the closing quotation mark.",
+     "examples": {"match": ["The court held that \"notice must be personal. Doe v. Roe, 600 So. 2d 10 (Fla. 1995).", "Doe v. Roe, 600 So. 2d 10 (Fla. 1995) (holding that \"notice must be personal)."], "no_match": ["The court held that \"notice must be personal.\" Doe v. Roe, 600 So. 2d 10 (Fla. 1995).", "The board was 6\" wide. Doe v. Roe, 600 So. 2d 10 (Fla. 1995)."]}},
+
+    {"id": "quote-no-pin", "authority": "Indigo Book R11.7", "severity": "check", "kind": "logic", "logic": "quote_no_pin", "tier": "bluebook",
+     "message": "A quotation from a case needs the page it's on, and this citation gives none (directly, through Id., or through a short form).",
+     "examples": {"match": ["The court held that \"notice must be personal to the defendant.\" Doe v. Roe, 600 So. 2d 10 (Fla. 1995).", "Doe v. Roe, 600 So. 2d 10 (Fla. 1995). The court held that \"notice must be personal to the defendant.\" Id."], "no_match": ["The court held that \"notice must be personal to the defendant.\" Doe v. Roe, 600 So. 2d 10, 12 (Fla. 1995).", "Doe v. Roe, 600 So. 2d 10, 12 (Fla. 1995). The court held that \"notice must be personal to the defendant.\" Id.", "The statute says \"notice must be personal to the defendant.\" § 48.031(1)(a), Fla. Stat."]}},
+
+    {"id": "pin-at-in-full", "authority": "Indigo Book R11.1", "severity": "error", "kind": "pattern", "tier": "bluebook",
+     "pattern": "(?<![\\w.,§])(\\d{1,4} (?:{reporter}) \\d{1,5}),? at (\\d{1,5}(?:[-–]\\d{1,5})?)(?![\\d*:])", "fix": "\\1, \\2",
+     "message": "In a full citation the pinpoint follows the first page after a comma, without \"at\": 594 So. 2d 292, 293. Only a short form, which drops the first page, uses \"at\": 594 So. 2d at 293. The facts loop may correct the page too.",
+     "examples": {"match": ["Doe v. Roe, 594 So. 2d 292 at 293 (Fla. 1992).", "Doe v. Roe, 700 F.3d 100, at 104-05 (11th Cir. 2012).", "Doe v. Roe, 300 N.E.2d 5 at 7 (Mass. 1973)."], "no_match": ["Doe, 594 So. 2d at 293.", "Doe v. Roe, 594 So. 2d 292, 293 (Fla. 1992).", "Doe v. Roe, 2014 WL 7463592, at *3 (Fla. 2014).", "Id. at 293.", "594 So. 2d 292 at 12:30"]}},
+
+    {"id": "id-no-period", "authority": "Indigo Book R6.2.2", "severity": "error", "kind": "pattern", "tier": "bluebook",
+     "pattern": "(?<![\\w.'])(?:([Ii])d,?(?= at \\*?\\d)|([Ii])d(?= \\((?:citing|quoting|emphasis|alteration|internal|citation|footnote|cleaned up)\\b| [§¶] ?\\d))", "fix": "\\1\\2d.",
+     "message": "Id. takes a period; it abbreviates idem.",
+     "examples": {"match": ["Fenelon v. State, 594 So. 2d 292 (Fla. 1992). Id at 293.", "Doe v. Roe, 594 So. 2d 292 (Fla. 1992). Id, at 293.", "Id (citing Doe v. Roe, 594 So. 2d 292 (Fla. 1992)).", "See id (quoting the statute).", "Id § 5.", "Id ¶ 12."], "no_match": ["Fenelon v. State, 594 So. 2d 292 (Fla. 1992). Id. at 293.", "Id. (citing Doe v. Roe, 594 So. 2d 292 (Fla. 1992)).", "ID at 5", "Freud placed the id (the unconscious) first.", "Idaho at 5"]}},
+
+    {"id": "id-bare-page", "authority": "Indigo Book R6.2.2", "severity": "error", "kind": "pattern", "tier": "bluebook",
+     "pattern": "(?<![\\w.'])Id (\\d{1,5}(?:[-–]\\d{1,5})?)(?![\\d:]|[.,]\\d)", "fix": "Id. at \\1",
+     "message": "Id. takes a period, and a page pinpoint after it takes \"at\": Id. at 293.",
+     "examples": {"match": ["Doe v. Roe, 594 So. 2d 292 (Fla. 1992). Id 293.", "Id 293-94."], "no_match": ["Id. at 293.", "Id at 293.", "Id 12:4.", "ID 293"]}},
+
+    {"id": "id-ibid", "authority": "Indigo Book R6.2.2", "severity": "error", "kind": "pattern", "tier": "bluebook",
+     "pattern": "(?<![\\w.'])([Ii])bid\\b\\.?", "fix": "\\1d.",
+     "message": "The short form for the immediately preceding authority is Id., not ibid.",
+     "examples": {"match": ["Ibid.", "Fenelon v. State, 594 So. 2d 292 (Fla. 1992); see ibid. at 293."], "no_match": ["Id."]}},
+
+    {"id": "id-after-string", "authority": "Indigo Book R15.3.3", "severity": "check", "kind": "logic", "logic": "id_after_string", "tier": "bluebook",
+     "message": "Id. can't follow a string citation, even to mean its last authority; use that authority's short form.",
+     "examples": {"match": ["Courts agree. Buncayo v. Dribin, 533 So. 2d 935 (Fla. 3d DCA 1988); Sotolongo v. State, 530 So. 2d 514 (Fla. 2d DCA 1988). Id. at 515."],
+                  "no_match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Id. at 294. Id.",
+                               "Hormel v. Henson, 594 So. 2d 292, 293 (Fla. 1992) (quoting Fenelon v. State, 530 So. 2d 514 (Fla. 2d DCA 1988)). Id. at 294."]}},
+
+    {"id": "id-antecedent-mismatch", "authority": "Indigo Book R6.2.2", "severity": "check", "kind": "logic", "logic": "id_antecedent", "tier": "bluebook",
+     "message": "Id. refers to the immediately preceding citation, and its pinpoint doesn't fit that authority.",
+     "examples": {"match": ["The trial court must hold a hearing. Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Service is governed by statute. See § 48.031, Fla. Stat. (2014). The hearing must be recorded. Id. at 294.",
+                            "Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Id. § 48.031."],
+                  "no_match": ["Service is governed by statute. § 48.031, Fla. Stat. (2014). Substitute service too. Id. § 48.032.",
+                               "Service is governed by statute. § 48.031, Fla. Stat. (2014). The court so found. (R. 45). Id. at 46."]}},
+
+    {"id": "pin-before-first-page", "authority": "Indigo Book R11.7", "severity": "error", "kind": "logic", "logic": "pin_before_first_page", "tier": "bluebook",
+     "message": "A pinpoint can't come before the case's first page.",
+     "examples": {"match": ["Fenelon v. State, 594 So. 2d 292, 288 (Fla. 1992).",
+                            "Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Sansone v. United States, 380 U.S. 343 (1965). Fenelon, 594 So. 2d at 288."],
+                  "no_match": ["Fenelon v. State, 594 So. 2d 292, 292 (Fla. 1992). Fenelon, 594 So. 2d at 294. Id. at 295."]}},
+
+    {"id": "short-before-full", "authority": "Indigo Book R15.2.1", "severity": "error", "kind": "logic", "logic": "short_before_full", "tier": "bluebook",
+     "message": "A short form comes before the case's first full citation; give the full citation first.",
+     "examples": {"match": ["The rule is settled. Fenelon, 594 So. 2d at 293. It has long been so. Fenelon v. State, 594 So. 2d 292 (Fla. 1992)."],
+                  "no_match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Sansone v. United States, 380 U.S. 343 (1965). Fenelon, 594 So. 2d at 294."]}},
+
+    {"id": "short-without-full", "authority": "Indigo Book R15.2.1", "severity": "check", "kind": "logic", "logic": "short_without_full", "tier": "bluebook",
+     "message": "A short form for a case the document never cites in full (as far as the script can see); give the full citation where the case is first cited.",
+     "examples": {"match": ["The rule is settled. Fenelon, 594 So. 2d at 293."],
+                  "no_match": ["Fenelon v. State, 594 So. 2d 292 (Fla. 1992). Fenelon, 594 So. 2d at 293."]}},
+
+    {"id": "short-volume-mismatch", "authority": "Indigo Book R15.2.2", "severity": "error", "kind": "logic", "logic": "short_volume", "tier": "bluebook",
+     "message": "A short form's volume differs from the one in the case's full citation.",
+     "examples": {"match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Sansone v. United States, 380 U.S. 343 (1965). Fenelon, 549 So. 2d at 294."],
+                  "no_match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Sansone v. United States, 380 U.S. 343 (1965). Fenelon, 594 So. 2d at 294."]}},
+
+    {"id": "supra-case", "authority": "Indigo Book R6.2.3", "severity": "check", "kind": "logic", "logic": "supra_case", "tier": "bluebook",
+     "message": "The Bluebook system doesn't use supra for cases; use the case's short form. Florida courts sometimes do, so this is a check, not an error.",
+     "examples": {"match": ["Fenelon v. State, 594 So. 2d 292 (Fla. 1992). Fenelon, supra, at 293.", "See Thompson v. Oklahoma, supra."],
+                  "no_match": ["Scalia & Garner, supra, at 193.", "See Section I.A., supra."]}},
+
+    {"id": "full-cite-repeated", "authority": "Indigo Book R15.2.1", "severity": "check", "kind": "logic", "logic": "full_repeated", "tier": "bluebook",
+     "message": "A full citation repeated soon after the first; a short form will do. Repeating it after a new heading or page break is allowed.",
+     "examples": {"match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). The Court then held otherwise. Sansone v. United States, 380 U.S. 343 (1965). Returning to the first point, Fenelon v. State, 594 So. 2d 292, 294 (Fla. 1992)."],
+                  "no_match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). The Court then held otherwise.\fReturning to the first point, Fenelon v. State, 594 So. 2d 292, 294 (Fla. 1992)."]}}
+  ]
+}
