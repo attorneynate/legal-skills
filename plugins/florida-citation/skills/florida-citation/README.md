@@ -79,7 +79,7 @@ The facts loop:
 
 **What it costs.** The script's report is free: it runs offline in about a second. Confirming cases costs case-law lookups, and a free tier allows only so many (CourtListener's: a few a minute, about a hundred a day), which is why the batch comes first. Verifying a quotation means reading its source, often several thousand tokens each. So the agent gives you the free report first, says what confirming the cases and the quotations would take, and goes only as far as you choose.
 
-**Exhibits.** A filing with exhibits attached (a slip sheet such as "Exhibit 1", or a Westlaw or Lexis printout of an opinion) gets a note at the top of the report: their citations and quotations are another writer's. `--last-page N` checks only the filing.
+**Exhibits.** A filing with exhibits attached (a slip sheet such as "Exhibit 1", a short cover sheet such as "Exhibit A Proposed Order", or a Westlaw or Lexis printout of an opinion) gets a note at the top of the report: their citations and quotations are another writer's. `--last-page N` checks only the filing.
 
 The judgment stays with the agent and the arithmetic with the script. The report frames every item as something to confirm: a mismatch can be a typo, a parallel cite, the wrong case, or a case that doesn't exist. It never calls a case fake.
 

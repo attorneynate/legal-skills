@@ -1,5 +1,9 @@
 # Changelog
 
+## florida-citation 1.1.1 (2026-10-05)
+
+A citation that opens its sentence (or follows a short opener such as "Similarly,") is now read as part of the sentence; docket numbers with an OCR'd symbol inside are read; exhibit cover sheets are recognized as the start of exhibits.
+
 ## federal-law 1.0.5 (2026-10-05)
 
 Never reports a rate limit or a GovInfo link-service error as a missing citation: a 429 now stops with a RATE LIMITED message saying nothing was looked up, and only GovInfo's 'no such citation' answer reads as missing.

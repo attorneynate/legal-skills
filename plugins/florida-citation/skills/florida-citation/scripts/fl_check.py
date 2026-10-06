@@ -131,7 +131,12 @@ NO_OCRMYPDF = ("To install OCRmyPDF and Tesseract, the OCR engine it runs:\n"
 SCANNED_PAGE_CHARS = 100        # most pages with less text than this means a scanned PDF
 EMPTY_PAGE_CHARS = 20            # a page with less than this is listed in the report's notes
 # A page that is only a slip sheet before an exhibit or appendix, and a case database's print footer.
-SLIP_SHEET = re.compile(r"(?i)(?:exhibit|exh?\.|attachment|appendix|app\.|tab)\s*[\w.\-]{0,6}")
+SLIP_SHEET = re.compile(r"(?i)(?:exhibits?|exh?\.|attachments?|appendix|appendices|app\.|tabs?)(?![a-z])\s*[\w.\-]{0,6}")   # not "TABLE"
+# A cover sheet: the label, then a title or a note ("EXHIBIT A PROPOSED ORDER (courtesy copy)"), on a short page.
+COVER_SHEET = re.compile(r"(?i)(?:exhibits?|exh?\.|attachments?|appendix|appendices|app\.|tabs?)(?![a-z])\s*"
+                         r"[\w.\-]{1,6}(?![\w.\-])(?-i:(?=\s+[A-Z(\[\"“]))")   # the title is capitalized: not "Exhibit B shows"
+COVER_CHARS = 200
+COVER_LINES = 4
 PRINTOUT = re.compile(r"(?i)\b(Westlaw)\b[^\n]{0,25}\bThomson Reuters\b|\bmember of the (LexisNexis) Group\b")
 
 
@@ -1063,17 +1068,23 @@ class Doc:
 
     def appended(self):
         """Where exhibits or an appendix seem to begin, after page 1: the first page that is only a slip
-        sheet ("Exhibit 1", "Appendix A"), else the first page printed from a case database (a Westlaw
-        or Lexis footer). Returns {"page", "why"} or None. Their citations are another writer's."""
+        sheet ("Exhibit 1", "Appendix A") or a short cover sheet starting with one ("EXHIBIT A PROPOSED
+        ORDER"), else the first page printed from a case database (a Westlaw or Lexis footer). Returns
+        {"page", "why"} or None. Their citations are another writer's."""
         if not self.ff:
             return None
         bounds = [-1] + self.ff + [len(self.raw)]
         printed = None
         for i in range(1, min(self.pages, len(bounds) - 1)):
             text = "\n".join(ln for ln in self.raw[bounds[i] + 1:bounds[i + 1]].split("\n") if not STAMP.match(ln))
-            m = SLIP_SHEET.fullmatch(text.strip())
+            lines = [ln.strip() for ln in text.split("\n") if ln.strip() and not PAGE_NUMBER.match(ln)]
+            sheet = " ".join(lines)
+            m = SLIP_SHEET.fullmatch(sheet)
             if m:
                 return {"page": i + 1, "why": f'reads only "{m.group(0)}"'}
+            m = COVER_SHEET.match(sheet)
+            if m and len(sheet) <= COVER_CHARS and len(lines) <= COVER_LINES:
+                return {"page": i + 1, "why": f'is a cover sheet starting "{m.group(0)}"'}
             p = PRINTOUT.search(text) if printed is None else None
             if p:
                 printed = {"page": i + 1, "why": "is printed from " + ("Westlaw" if p.group(1) else "Lexis")}
@@ -1480,7 +1491,9 @@ OFFICIAL_BEFORE = re.compile(r"(?<![\w.,§])\d{1,4} (?P<rep>" + REP_WORD + r"(?:
 PIN = re.compile(r"(?:,|,? )(?:at )?(\*{0,2}\d+(?:[-–—]\*{0,2}\d+)?(?: nn?\. ?\d+(?:[-–]\d+)?)?(?: & nn?\. ?\d+)?)(?!\d)")
 PAREN = re.compile(r" ?\(((?:[^()]|\([^()]*\))*)\)")
 EXTRA_PAREN = re.compile(r" ?\((?:Table|table|mem\.?|unpublished table decision|per curiam)\)")
-DOCKET = r"[A-Za-z0-9][\w:./\-]*\d[\w:./\-]*"
+# A docket number after "No.": any run with a digit, to the comma. OCR can put a stray symbol inside
+# one ("4:19¢v77"), and a symbol shouldn't make the number disappear.
+DOCKET = r"[A-Za-z0-9][^\s,;()\[\]\"“”]*\d[^\s,;()\[\]\"“”]*"
 # A blank for a cite not yet assigned: "___ So. 3d ___", "--- So. 3d ---", "— U.S. —".
 BLANK = r"(?:_{2,}|-{2,}|[—–]{1,3})"
 # A docket number written without "No.": a Florida appellate number (SC2010-1544), or a federal one
@@ -2695,9 +2708,20 @@ def lc_signal_capital(ctx, rec):
         yield {"start": a, "end": b, "fix": norm[a].lower() + norm[a + 1:b]}
 
 
+def _opens_sentence(norm, start):
+    """Does the sentence start at `start`, or after a short opener ("Similarly, ", "In addition, ")?"""
+    a = max(0, start - 60)
+    window = ("start. " if a == 0 else "") + norm[a:start]
+    # A sentence ends after a word of three or more letters, a number, or a parenthesis, not after a
+    # signal or an abbreviation ("Cf. ", "e.g. ", "Inc. ").
+    m = re.search(r"(?:\)|[a-z]{3}|\d)[.!?][\"'”’)\]]*\s(?:(?P<intro>[A-Z][a-z]+(?: [a-z]+){0,2}), )?$", window)
+    return bool(m) and (not m.group("intro") or not set(m.group("intro").lower().split()) & GOVERNING_STOP)
+
+
 def lc_in_sentence(ctx, rec):
-    """Abbreviated forms used as an integral part of a sentence: a governing word before the
-    citation ("under", "of", "pursuant to") and the sentence going on after it (", the court ...")."""
+    """Abbreviated forms used as an integral part of a sentence: the sentence going on after the citation
+    (", the court ...", ", provides"), and before it a governing word ("under", "of", "pursuant to") or
+    the sentence's start, where the citation is its subject ("Section 48.031, Fla. Stat., provides")."""
     norm = ctx["doc"].norm
     for c in ctx["cites"]:
         if c["in_quote"] or c["kind"] not in ("constitution", "statute", "rule", "admin_code", "session_law") \
@@ -2705,9 +2729,12 @@ def lc_in_sentence(ctx, rec):
             continue
         before = norm[max(0, c["start"] - 40):c["start"]]
         m = re.search(r"(?:^|[\s(])([A-Za-z][a-z]+)\s$", before)
-        if not m or m.group(1).lower() in GOVERNING_STOP or re.search(r",\s?with\s$", before):
+        if m and (m.group(1).lower() in GOVERNING_STOP or re.search(r",\s?with\s$", before)):
             continue                       # a signal ("see", "compare ..., with"), not a governing word
-        if not re.match(r", (?!see\b|e\.g\.|aff'd|rev'd|cert\.|review|and\b|or\b)[a-z]", norm[c["end"]:c["end"] + 12]):
+        if not m and not _opens_sentence(norm, c["start"]):
+            continue
+        if not re.match(r", (?!see\b|e\.g\.|aff'd|rev'd|cert\.|review|and\b|or\b|amended\b|repealed\b|renumbered\b"
+                        r"|transferred\b)[a-z]", norm[c["end"]:c["end"] + 14]):
             continue
         text = norm[c["start"]:c["end"]]
         fix = spelled_out(c, text, ctx["engine"].data)
