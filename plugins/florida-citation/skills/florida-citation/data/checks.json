@@ -266,7 +266,7 @@
 
     {"id": "j-rule-set-name", "authority": "9.800(j)", "severity": "error", "kind": "table", "table": "rule_sets.variants",
      "message": "Rule-set abbreviation differs from the rule's form (9.800(j) lists all 23).",
-     "examples": {"match": ["Fla. R. App. Pro. 9.100", "Fla.R.Civ.P. 1.180", "Fla. R. Jud. Admin. 2.420", "Fla. Fam. Law R. P. 12.010"], "no_match": ["Fla. R. App. P. 9.100", "Fla. R. Civ. P. 1.180", "Fla. R. Gen. Prac. & Jud. Admin. 2.420", "Fla. Fam. L. R. P. 12.010", "In re Amends to Fla. R. Civ. Pro. 1.510, 309 So. 3d 192"]}},
+     "examples": {"match": ["Fla. R. App. Pro. 9.100", "Fla.R.Civ.P. 1.180", "Fla. R. Jud. Admin. 2.420", "Fla. Fam. Law R. P. 12.010", "filed pursuant to Fla.R.Crim.P. 3.852(h) for", "a violation of Fla. R. Jud. Admin. 2.420", "Fla.R.Crim.P. 3.850, 3.851"], "no_match": ["Fla. R. App. P. 9.100", "Fla. R. Civ. P. 1.180", "Fla. R. Gen. Prac. & Jud. Admin. 2.420", "Fla. Fam. L. R. P. 12.010", "In re Amends to Fla. R. Civ. Pro. 1.510, 309 So. 3d 192", "In re Amendments to Fla. R. App. Pro. 9.800, 300 So. 3d 1"]}},
 
     {"id": "j-rule-set-number", "authority": "9.800(j)", "severity": "check", "kind": "logic", "logic": "rule_set_number",
      "message": "The rule number doesn't belong to that rule set (civil rules are 1.xxx, criminal 3.xxx, appellate 9.xxx, and so on).",

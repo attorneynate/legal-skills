@@ -1,5 +1,9 @@
 # Changelog
 
+## florida-citation 1.1.2 (2026-10-05)
+
+A rule citation after "to" or "of" (pursuant to Fla.R.Crim.P. 3.852) is checked again; only a rule named inside a case name, followed by that case's citation, is skipped.
+
 ## florida-citation 1.1.1 (2026-10-05)
 
 A citation that opens its sentence (or follows a short opener such as "Similarly,") is now read as part of the sentence; docket numbers with an OCR'd symbol inside are read; exhibit cover sheets are recognized as the start of exhibits.

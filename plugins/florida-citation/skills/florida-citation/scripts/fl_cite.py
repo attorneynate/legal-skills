@@ -309,9 +309,10 @@ def table_patterns(record, data):
     elif record["table"] == "rule_sets.variants":
         for s in data["rule_sets"]["sets"]:
             for v in s["variants"]:
-                # Not after "to" or "of": "In re Amendments to Fla. R. Civ. Pro. 1.510" is a case name.
-                out.append((r"(?<![\w.])(?<!to )(?<!of )" + re.escape(v) + r"(?= ?\d)", literal(s["abbr"]),
-                            f"9.800(j)({s['n']})"))
+                # Not when the case's own citation follows the number: "In re Amends to Fla. R. Civ. Pro.
+                # 1.510, 309 So. 3d 192" is a case name. A rule citation never runs into a volume and reporter.
+                out.append((r"(?<![\w.])" + re.escape(v) + r"(?= ?\d)(?! ?\d[\w.()]*, \d{1,4} [A-Z])",
+                            literal(s["abbr"]), f"9.800(j)({s['n']})"))
     elif record["table"] == "months":
         # Only in a court's date parenthetical; other sources (staff analyses, recordings) are outside 9.800.
         months = [(full, short) for full, short in data["months"]["abbr"].items() if full != short] + [("Sep.", "Sept.")]
