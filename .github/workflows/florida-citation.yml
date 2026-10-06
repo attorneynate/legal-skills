@@ -45,7 +45,9 @@ jobs:
   offline:
     # No network: the scripts must compile, every command must parse its arguments, and the
     # commands that need no network must answer, on the oldest and newest supported Pythons.
-    runs-on: ubuntu-latest
+    # Python 3.9 stays on Ubuntu 24.04: ubuntu-latest becomes Ubuntu 26 on 2026-10-19,
+    # and setup-python may not offer 3.9 (past end of life) there.
+    runs-on: ${{ matrix.python == '3.9' && 'ubuntu-24.04' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python: ["3.9", "3.13"]
@@ -76,7 +78,9 @@ jobs:
     # The self-test: every command offline, two court opinions fetched from the Florida courts'
     # website and checked, and CourtListener's search for new Rule 9.800 amendments. No key is
     # needed. It fails only on FAIL; CHANGED, FLAKY, and BLOCKED are reported, not failures.
-    runs-on: ${{ matrix.os }}
+    # Python 3.9 stays on Ubuntu 24.04: ubuntu-latest becomes Ubuntu 26 on 2026-10-19,
+    # and setup-python may not offer 3.9 (past end of life) there.
+    runs-on: ${{ (matrix.os == 'ubuntu-latest' && matrix.python == '3.9') && 'ubuntu-24.04' || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
