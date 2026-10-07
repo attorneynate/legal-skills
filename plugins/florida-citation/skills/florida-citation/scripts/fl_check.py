@@ -22,6 +22,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import fl_cite as fc
+import fl_sentence as fs
 
 TIER_RULE = "Rule 9.800"
 TIER_BLUEBOOK = "Bluebook system (Indigo Book)"
@@ -782,6 +783,14 @@ class Doc:
         self.quotes, self.unclosed_quotes = paired_quotes(self)
         self.defined_terms = [q for q in self.quotes if defined_term(self.norm, *q)]
         self.quotes = [q for q in self.quotes if q not in self.defined_terms]
+        self.periods = self.brackets = self.clauses = self.sentences = None
+
+    def read_sentences(self, abbreviations):
+        """Build the sentence reader's layers (fl_sentence.py) over norm, with the quotations opaque."""
+        self.periods = fs.Periods(self.norm, abbreviations)
+        self.brackets = fs.Brackets(self.norm, self.periods, self.quotes)
+        self.clauses = fs.Clauses(self.norm, self.periods, self.brackets)
+        self.sentences = fs.Sentences(self.norm, self.periods, self.brackets)
 
     def _block_quotes(self):
         """Norm spans of block quotations, which carry no quotation marks. The source's layout decides
@@ -1176,7 +1185,8 @@ def _running_line(raw, pages, at, skip=()):
     to its last. The regex allows OCR's stray spaces and misread digits but requires the same number of
     characters, ending (or, for a footer, starting) at a word break, so it never takes text from the
     body. And the text must be the same on most of those pages, so pages that merely start or end alike
-    ("Id. at 5.", "Id. at 7.") are never taken for one."""
+    ("Id. at 5.", "Id. at 7.") are never taken for one. Nor are pages that start or end with the same
+    words of a sentence ("Further, ..."; see _runs_into_body)."""
     first = at == "first"
     cores = {}
     for i, pg in enumerate(pages):
@@ -1194,23 +1204,52 @@ def _running_line(raw, pages, at, skip=()):
         if not dense:
             break
         best = max(dense, key=lambda h: len(groups[h]))
+    prose = set()
     for k in range(len(best), HEADER_MIN - 1, -1):     # back off to a word break
         head = best[:k] if first else best[:k][::-1]
         if sum(ch.isalpha() for ch in head) < 3:
-            return None
+            break
         parts = ["[" + re.escape(DIGITISH) + "]" if ch == "#" else re.escape(ch) for ch in head]
         body = r"\s*".join(parts)
         rx = re.compile(r"\s*" + body + r"(?=\s|$)" if first else r"(?<!\S)" + body + r"\s*$")
-        texts = {}
+        texts, found = {}, {}
         for i, (ca, cb, _) in cores.items():
             m = rx.match(raw, ca, cb) if first else rx.search(raw, ca, cb)
             if m:
                 texts.setdefault(_header_text(m.group(0)), []).append(i)
+                found[i] = m
         if texts:
             text, hit = max(texts.items(), key=lambda kv: len(kv[1]))
             if _dense(hit) and len(hit) * 5 >= sum(len(v) for v in texts.values()) * 3:
+                if _runs_into_body(raw, cores, found, hit, first):     # a sentence: back off from it
+                    prose.update(hit)
+                    continue
                 return rx, text
+    if prose:       # pages that only start or end alike: look again without them
+        return _running_line(raw, pages, at, set(skip) | prose)
     return None
+
+
+def _runs_into_body(raw, cores, found, hit, first):
+    """Whether a candidate running line is a piece of a sentence that pages merely share, on most of its
+    pages: a single word, or a header ending at a comma or a lowercase word, that the text after it on
+    the same line continues in lowercase ("Defendants on count two", "Further, determining ...",
+    "Further, the history ..."); or a single word, or a footer starting with a lowercase word, after a
+    word on the same line ("... to grant summary judgment in favor of"). A real header is more than
+    one word and ends in a name, a number, or a title ("Cases, cont'd." is followed by a case name or a
+    line break), and a real footer starts with a capital, a digit, or a symbol."""
+    joins = 0
+    for i in hit:
+        ca, cb, _ = cores[i]
+        words = found[i].group(0).split()
+        if first:
+            joins += ((len(words) == 1 or words[-1].endswith(",") or words[-1].islower())
+                      and raw[found[i].end():cb].lstrip()[:1].islower())
+        else:
+            before = raw[ca:found[i].start()].rstrip()
+            joins += ((len(words) == 1 or words[0][:1].islower())
+                      and bool(before) and (before[-1].isalpha() or before[-1] == ","))
+    return joins * 5 >= len(hit) * 3
 
 
 def _strip_running(raw, pg, at, rx, text, pages=None):
@@ -1379,17 +1418,22 @@ def parse_paren(text):
 # ---------------------------------------------------------------- patterns for extraction
 
 # Words that end a case name when walking back from "v." (signals and sentence openers), words a
-# name can contain in lowercase, and what a party name never contains (another citation, a sentence).
+# name can contain in lowercase, and what a party name never contains (another citation). Where the
+# sentence holding a name starts is the period layer's to say (fl_sentence.py), not these.
 NAME_STOP = {"see", "cf.", "accord", "compare", "contra", "but", "quoting", "citing", "e.g.,", "e.g.", "also",
              "generally", "under", "in", "as", "because", "since", "after", "following", "although", "thus",
              "therefore", "here", "when", "while", "like", "unlike", "per", "from", "by", "with", "that",
              "applying", "discussing", "explaining", "holding", "noting", "overruling", "reviewing", "and", "or",
              "id.", "id", "ibid.", "supra", "pursuant", "whether", "where", "unless", "until", "before", "during"}
 NAME_CONNECTORS = {"of", "the", "&", "for", "de", "del", "la", "ex", "rel.", "on", "to", "a", "an",
-                   "d/b/a", "f/k/a", "n/k/a", "et", "al.", "al.,", "y", "-", "–", "—"}   # "Baker Western – De Luca Joint Venture"
-# A sentence or citation inside a party's name. Lowercase after a period is a sentence unless it's a
-# connector after an abbreviation: "Sch. Bd. of Lake Cnty.", "Univ. of Fla.".
-BAD_NAME = re.compile(r"[;\"()]|\. (?!(?:of|and|for|de|del|la|ex|rel|on|to|y)\b)[a-z]|\d{1,4} [A-Z][\w.']* ?\d")
+                   "d/b/a", "f/k/a", "n/k/a", "et", "al.", "al.,", "y", "-", "–", "—",
+                   "etc.", "etc.,"}     # a caption's capacity cut short: "Able Imports, Inc. etc. v. Baker"   # "Baker Western – De Luca Joint Venture"
+NAME_PARTICLES = {"De", "Del", "La"}     # capitalized, a surname's start, not a connector: "Del Mar Produce Co."
+# A clause, quotation, parenthetical, or citation inside a party's name.
+BAD_NAME = re.compile(r"[;\"()]|\d{1,4} [A-Z][\w.']* ?\d")
+# A period before a lowercase word: an abbreviation the period layer knows ("Vill. at Lakeside", "Real
+# Prop. in Lake Cnty.", "E.I. du Marais") or a connector after one it doesn't ("Univ. of Fla.").
+LOWER_AFTER_PERIOD = re.compile(r"(\S+)\. (?!(?:of|and|for|de|del|la|ex|rel|on|to|y)\b)[a-z]")
 TOA_HEADINGS = {"CASES", "TABLE", "CITATIONS", "AUTHORITIES", "PAGE", "PAGES", "NO.", "STATUTES", "RULES", "OTHER",
                 "CONSTITUTIONAL", "PROVISIONS", "ARGUMENT", "CONCLUSION", "CERTIFICATE", "SERVICE", "COMPLIANCE"}
 
@@ -1400,15 +1444,29 @@ def _name_word(t, bare, low):
         return True                        # a spaced dash inside a name; one left at the front is trimmed
     if re.search(r"[;:]$|\)|[.!?][\"'”’]$|\.{3}|…", t):
         return False                       # ends a clause, a parenthetical, or a quotation; TOA leader dots
-    if re.fullmatch(r"[A-Z][a-z]{7,}\.|Yes\.", t):
-        return False                       # "Constitution." ends a sentence; abbreviations are shorter. "A. Yes."
-    if re.fullmatch(r"[a-z]{2,}[.,]", t) and low not in NAME_CONNECTORS:
-        return False                       # "court." ends the sentence before
     if re.fullmatch(r"[\d\-–.,()*]+", t):
         return False                       # "73-178." or a table-of-authorities page number
     if bare.rstrip(".,") in TOA_HEADINGS or bare in TOA_HEADINGS:
         return False
     return bare[0].isupper() or bare[0].isdigit() or low in NAME_CONNECTORS
+
+
+def _plain_name(text):
+    """Is text only a party's name: capitalized words, numbers, and connectors? Asked of a name with no comma
+    before its volume, which nothing else sets off from running text ("the plaintiff claimed ... MRSA. 291").
+    A court's abbreviation belongs in the parenthetical, not at a name's end: "State v. Able, DCA 420 So.
+    2d" is a scramble (an OCR'd column), not a name missing its comma."""
+    words = text.split()
+    return bool(words) and words[-1] not in ("DCA", "Cir.", "Ct.") and all(
+        t[0].isupper() or t[0].isdigit() or t.lower() in NAME_CONNECTORS or t in ("and", "&") for t in words)
+
+
+def _bad_name(text, abbr):
+    """Does a party's name hold a clause, quotation, parenthetical, citation, or sentence? The period layer
+    reads a period before a lowercase word as an abbreviation, which running text needs; in a name it's
+    one only if the layer knows the word: "Doe v. Roe. the court then held" holds a sentence."""
+    return bool(BAD_NAME.search(text)) or any(not abbr.known(m.group(1).lstrip("([\"'"))
+                                                for m in LOWER_AFTER_PERIOD.finditer(text))
 HISTORY = re.compile(
     r"(?:aff'd|rev'd|affirmed|reversed|approved|quashed|disapproved|vacated|modified|abrogated|overruled|"
     r"receded from|superseded|dismissed|declined to follow|cert\. (?:denied|granted|dismissed)|"
@@ -1520,7 +1578,7 @@ ID_RX = re.compile(r"(?<![\w.'])(?:(?P<id>[Ii]d\.|[Ii]bid\.?|[Ii]d(?=,? at \*?\d
                    r"|(?P<bare_id>Id) (?P<bare>\d{1,5}(?:[-–]\d{1,5})?)(?![\d:]|[.,]\d))")
 SUPRA_RX = re.compile(r"\(?\bsupra\b\)?(?: note \d+)?(?P<pin>,? at (?P<page>" + PAGE_PIN + r"))?")
 SUPRA_NAME = re.compile(r"((?:[A-Z][\w'&\-]*\.?|v\.|of|the|de|for|&|ex rel\.)(?: (?:[A-Z][\w'&\-]*\.?,?|v\.|of|the|de|for|&|ex rel\.)){0,10}),? $")
-SHORT_NAME = re.compile(r"((?:[A-Z][\w'&\-]*\.?|of|the|de|&|ex rel\.)(?: (?:[A-Z][\w'&\-]*\.?|of|the|de|&|ex rel\.)){0,5}), $")
+SHORT_NAME = re.compile(r"((?:(?:[A-Z]\.){2,}|[A-Z][\w'&\-]*\.?|of|the|de|&|ex rel\.)(?: (?:[A-Z][\w'&\-]*\.?|of|the|de|&|ex rel\.)){0,5}), $")
 # Record and appendix cites ("Trial R.19", "(R. 45)", "(V3 T. 120)", "App. 12", "I.B. at 5"), which an
 # Id. may follow (wrongly, Indigo Book R26), though the script doesn't extract them.
 RECORD_RX = re.compile(r"(?<![\w.])(?:(?:Trial|Supp\.|Vol\.|V\d+|[IVX]+|PC|Post-?conviction)\s?)?"
@@ -1555,6 +1613,7 @@ class Engine:
         self.by_id = {r["id"]: r for r in self.records}
         self.compiled = fc.compiled_checks(self.records, self.data)
         self.series = {s["abbr"]: s for s in self.data["reporters"]["series"]}
+        self.abbreviations = fs.Abbreviations(self.data)
         # Reporters the rule doesn't name, read as Bluebook-tier case citations (9.800(p)).
         self.bluebook_reporters = {s["abbr"] for s in self.data["reporters"]["bluebook_series"]}
         self.reporter_forms = fc.reporter_forms(self.data)
@@ -1590,6 +1649,7 @@ class Engine:
             "id_after_string": lc_id_after_string, "id_antecedent": lc_id_antecedent,
             "pin_before_first_page": lc_pin_before_first_page, "short_before_full": lc_short_before_full,
             "short_without_full": lc_short_without_full, "short_volume": lc_short_volume,
+            "short_missing_at": lc_short_missing_at, "name_comma": lc_name_comma,
             "supra_case": lc_supra_case, "full_repeated": lc_full_repeated, "signal_capital": lc_signal_capital,
             "record_cite_form": lc_record_cite_form, "ellipsis_form": lc_ellipsis_form,
         }
@@ -1603,13 +1663,20 @@ class Engine:
         norm = doc.norm
         quotes = [(a - 1, b) for a, b in doc.block_quotes] + doc.quotes
         cites = []
-        cites += self._cases(norm)
+        cites += self._cases(doc)
         taken = [(c["start"], c["end"]) for c in cites]
-        for c in self._slips(norm):
+        for c in self._slips(doc):
             if not _overlaps(c, taken):
                 cites.append(c)
         others = self._statutes(norm) + self._constitutions(norm) + self._admin(norm) + self._laws(norm) \
-            + self._rules(norm) + self._ags(norm) + self._shorts(norm) + self._ids(norm) + self._supras(norm)
+            + self._rules(norm) + self._ags(norm) + self._shorts(doc) + self._ids(norm) + self._supras(norm)
+        for c in cites:
+            # A rule number that ends a case's name is part of the name, not a rule citation: "In re
+            # Amendment to Florida Rule of Appellate Procedure 9.130, 300 So. 3d 190". A rule citation never runs
+            # into a case's own volume and reporter.
+            if c.get("case_name"):
+                others = [o for o in others if not (o["kind"] == "rule" and c["start"] < o["start"]
+                                                    and re.fullmatch(",? ", norm[o["end"]:c["cite_start"]]))]
         spans = [(o["start"], o["end"]) for o in others]
         blocks = []                            # block quotations, their lines joined
         for a, b in sorted(doc.block_quotes):
@@ -1631,6 +1698,7 @@ class Engine:
                     name = norm[b:c["cite_start"]].rstrip(", ")
                     if re.match(r"\S.* v\. \S", name) or name.startswith(("In re ", "Ex parte ")):
                         c["case_name"], c["start"], c["name_start"] = name, b, b
+        cites = self._short_without_at(doc, cites, others, quotes)
         cites = _resolve(cites, others)
         cites = _resolve(cites, self._unrecognized(norm))
         cites.sort(key=lambda c: c["start"])
@@ -1647,7 +1715,8 @@ class Engine:
                 prev_case = c
         return cites
 
-    def _cases(self, norm):
+    def _cases(self, doc):
+        norm = doc.norm
         anchors = list(self.anchor.finditer(norm))
         by_start = {m.start(): m for m in anchors}
         out, consumed = [], -1
@@ -1682,10 +1751,12 @@ class Engine:
                     paren = p
                     pos = m.end()
             consumed = pos
-            if paren is None and a.group("rep") and self.reporter_forms[a.group("rep")] in self.bluebook_reporters:
-                continue                       # "22 A. 23" in a deposition, "4500 N.W. 27 Avenue": no court and year
             c = {"kind": "case", "start": a.start(), "end": pos, "pins": pins, "paren": paren,
                  "reporters": [], "flw": None, "online": None, "docket": None}
+            if paren is None and a.group("rep") and self.reporter_forms[a.group("rep")] in self.bluebook_reporters:
+                # "22 A. 23" in a deposition, "4500 N.W. 27 Avenue": no court and year. Dropped unless it's a
+                # short form missing "at" (_short_without_at).
+                c["bare"] = True
             for p, own_pins in zip(parts, part_pins):
                 if p.group("rep"):
                     c["reporters"].append({"volume": p.group("vol"), "reporter": p.group("rep"),
@@ -1724,15 +1795,16 @@ class Engine:
                     c["start"] = m.start()
             if paren is None and not c["reporters"] and not c["flw"]:
                 c["kind"] = "case_short"          # "Beckman, 2026 WL 91580, at *12"
-            self._name_and_history(norm, c)
+            self._name_and_history(doc, c)
             if c["kind"] == "case_short":
                 c["pin"] = pins[0] if pins else None
-                _short_name(norm, c)
+                _short_name(doc, c)
             self._tier_case(c)
             out.append(c)
         return out
 
-    def _slips(self, norm):
+    def _slips(self, doc):
+        norm = doc.norm
         out = []
         for m in SLIP.finditer(norm):
             pm = PAREN.match(norm, m.end())
@@ -1745,18 +1817,77 @@ class Engine:
             c = {"kind": "case", "start": m.start(), "end": pm.end(), "pins": [], "paren": p, "reporters": [],
                  "flw": None, "online": None, "placeholder": False,
                  "docket": _docket(norm, m.start(), m.end())}
-            self._name_and_history(norm, c)
+            self._name_and_history(doc, c)
             self._tier_case(c)
             out.append(c)
         return out
 
-    def _name_and_history(self, norm, c):
+    def _short_without_at(self, doc, cites, others, quotes):
+        """A short form missing "at" ("Able, 800 A.2d 100.", "J.P., 900 So. 2d 113."): a reporter cite
+        with no parenthetical, no pinpoint, and no "v." name, whose clause ends right after it (the period
+        layer reads its last period as a sentence end, so it isn't a full citation cut short), following a
+        full citation of the same volume and reporter whose first page it can follow, and naming one of
+        that case's parties, or, unnamed, giving a page past its first. Taken as a short form (missing_at),
+        so the Id. after it and the quotation before it are tied. Not a parallel cite after another
+        ("Stevens, 529 U.S. at 771, 120 S. Ct. 1858"). Any other bare cite in a reporter the rule doesn't
+        name is dropped, as before."""
+        def quoted(i):
+            return any(a < i < b for a, b in quotes)
+        fulls = [f for f in cites if f["kind"] == "case" and f["paren"] and not quoted(f["start"])]
+        ends = {x["end"] for x in cites + others}
+        out = []
+        for c in cites:
+            bare = c.pop("bare", False)
+            r = c["reporters"][0] if c["kind"] == "case" and c["paren"] is None and len(c["reporters"]) == 1 else None
+            if (r is not None and not (c["flw"] or c["online"] or c["docket"] or c["pins"] or c.get("case_name")
+                                       or c.get("history") or c.get("official") or quoted(c["start"])
+                                       or c["start"] - 2 in ends)
+                    and r["volume"].isdigit() and r["page"].isdigit() and self._missing_at(doc, c, r, fulls)):
+                out.append(c)
+            elif not bare:
+                out.append(c)
+        return out
+
+    def _missing_at(self, doc, c, r, fulls):
+        """Is c, a bare reporter cite, a short form missing "at"? If so, make it one (see _short_without_at)."""
+        norm = doc.norm
+        m = re.match(r"[-–]\d{1,5}(?!\d)", norm[c["end"]:c["end"] + 7])      # "Patios West, 388 So. 3d 898-99."
+        end = c["end"] + (m.end() if m else 0)
+        if doc.clauses.clause_end(c["start"], after=end) != end or _toa_entry(doc, dict(c, end=end)):
+            return False
+        page, start = int(r["page"]), c["start"]
+        _short_name(doc, c)
+        name = c["short_name"]
+        fit = []
+        for f in fulls:
+            first = _first_page(f, r["canonical"])
+            if (f["end"] <= start and first is not None and first <= page
+                    and any(x["volume"] == r["volume"] and x["canonical"] == r["canonical"] for x in f["reporters"])
+                    and (_name_matches(name, f.get("case_name")) if name else first < page)):
+                fit.append(f)
+        if not fit:
+            c["start"] = start
+            c.pop("short_name")
+            return False
+        c.update(kind="case_short", end=end, pin=r["page"] + (m.group(0) if m else ""), missing_at=True,
+                 tier=TIER_RULE, authority="9.800", sub=None)
+        c.pop("what", None)
+        r["page"] = None
+        return True
+
+    def _name_and_history(self, doc, c):
+        norm = doc.norm
         c["case_name"] = None
         name_start = c["start"]
         w0 = max(0, c["start"] - 220)
         w = norm[w0:c["start"]]
-        if w.endswith(", "):
-            head = w[:-2]
+        # The name ends at the comma before the volume, or, with the comma left out, at a word or an
+        # abbreviation: "Zutell v. Sunrise Oldsmobile, Inc. 252 So. 2d 822" (comma_missing).
+        gap = 2 if w.endswith(", ") else 1 if re.search(r"[A-Za-z.'] $", w) else 0
+        if gap:
+            head = w[:-gap]
+            # A name lies inside one sentence: the one holding the comma before the cite.
+            begins = doc.periods.sentence_start(c["start"] - gap, plain=True) - w0
             v = None
             for m in re.finditer(r" (?:v|vs)\. ", head):
                 v = m
@@ -1768,7 +1899,8 @@ class Engine:
                 # A party may start with a number ("United States v. 4100 Elm St."); a citation inside
                 # the name may not.
                 rest = re.sub(r"^\$?\d[\d,]*\s", "", defendant)
-                if len(defendant) <= 140 and not BAD_NAME.search(rest):
+                if (len(defendant) <= 140 and not _bad_name(rest, doc.periods.abbr) and begins <= v.start()
+                        and (gap == 2 or _plain_name(rest))):
                     first = None                       # offset in head of the plaintiff's first word
                     toks = list(re.finditer(r"\S+", head[:v.start()]))
                     j = len(toks) - 1
@@ -1780,7 +1912,8 @@ class Engine:
                             continue
                         bare = t.strip("(\"'[")
                         low = bare.lower()
-                        if not bare or len(toks) - 1 - j >= 14 or low in NAME_STOP or not _name_word(t, bare, low):
+                        if (not bare or tm.start() < begins or len(toks) - 1 - j >= 14 or low.rstrip(",") in NAME_STOP
+                                or not _name_word(t, bare, low)):
                             break
                         first = tm.start() + (len(t) - len(t.lstrip("(\"'[")))
                         if t[0] in "(\"'[":
@@ -1790,16 +1923,20 @@ class Engine:
                         name = head[first:]
                         while True:                    # "of the Smith v. Jones" -> "Smith v. Jones"
                             m = re.match(r"(\S+) ", name)
-                            if not m or m.group(1).lower() not in NAME_CONNECTORS or name.startswith(m.group(1) + " v. "):
+                            if (not m or m.group(1).lower() not in NAME_CONNECTORS or m.group(1) in NAME_PARTICLES
+                                    or name.startswith(m.group(1) + " v. ")):
                                 break
                             name = name[m.end():]
                         c["case_name"] = name
-                        name_start = c["start"] - 2 - len(name)
+                        name_start = c["start"] - gap - len(name)
             elif inre:
                 rest = head[inre.start():]
-                if len(rest) <= 140 and not BAD_NAME.search(rest):
+                if (len(rest) <= 140 and not _bad_name(rest, doc.periods.abbr) and begins <= inre.start()
+                        and (gap == 2 or _plain_name(rest[inre.end() - inre.start():]))):
                     c["case_name"] = rest
                     name_start = w0 + inre.start()
+        if c["case_name"] and gap == 1:
+            c["comma_missing"] = True
         c["cite_start"] = c["start"]
         if c["case_name"]:
             c["name_start"] = name_start
@@ -1933,7 +2070,8 @@ class Engine:
                             "year": _year(m.group("year")), "tier": TIER_RULE, "authority": "9.800(k)"})
         return out
 
-    def _shorts(self, norm):
+    def _shorts(self, doc):
+        norm = doc.norm
         out = []
         for m in self.short.finditer(norm):
             c = {"kind": "case_short", "start": m.start(), "end": m.end(), "tier": TIER_RULE, "authority": "9.800",
@@ -1946,7 +2084,7 @@ class Engine:
                 f = m.group("flw")
                 ed = "supp" if "Supp" in f else ("fed" if "Fed" in f else "main")
                 c["flw"] = {"volume": int(m.group("vol")), "edition": ed, "page": None}
-            _short_name(norm, c)
+            _short_name(doc, c)
             out.append(c)
         return out
 
@@ -2007,7 +2145,9 @@ class Engine:
 
     def run(self, source, doc_date=None, date_source=None):
         doc = Doc(source)
+        doc.read_sentences(self.abbreviations)
         cites = self.extract(doc)
+        doc.sentences.overlay([(c["start"], c["end"]) for c in cites])
         ctx = {"doc": doc, "cites": cites, "doc_date": doc_date, "engine": self, "source": source}
         ctx["links"] = link_short_forms(doc, cites)
         for c in cites:
@@ -2187,19 +2327,22 @@ def _docket(norm, start, end):
     return {"text": text, "numbers": toks}
 
 
-def _short_name(norm, c):
-    """The party name before a short case cite ("See Fenelon, 594 So. 2d at 293" -> "Fenelon"), taken
-    into the citation's span. Not every short cite has one: the name may sit in the sentence before."""
+def _short_name(doc, c):
+    """The party name before a short case cite ("See Fenelon, 594 So. 2d at 293" -> "Fenelon", "J.P., 900
+    So. 2d at 113" -> "J.P."), taken into the citation's span. Not every short cite has one: the name may
+    sit in the sentence before. Like a full citation's name, it lies inside the sentence holding the comma
+    before the cite ("from Delaware. Able, 800 A.2d at 105" -> "Able")."""
+    norm = doc.norm
     c["short_name"] = None
-    m = SHORT_NAME.search(norm, max(0, c["start"] - 80), c["start"])
+    begins = doc.periods.sentence_start(c["start"] - 2, plain=True) if c["start"] >= 2 else 0
+    m = SHORT_NAME.search(norm, max(0, c["start"] - 80, begins), c["start"])
     if not m:
         return
     name, start = m.group(1), m.start(1)
-    while True:
-        t = re.match(r"(\S+) ", name)
-        if not t or t.group(1).lower() not in NAME_STOP | {"see"}:
+    for t in list(re.finditer(r"(\S+) ", name))[::-1]:
+        if t.group(1).lower() in NAME_STOP | {"see"}:      # a signal ends what came before: "in J.P. See Able"
+            name, start = name[t.end():], start + t.end()
             break
-        name, start = name[t.end():], start + t.end()
     if (name and name[0].isupper() and name.lower() not in NAME_STOP
             and not re.search(r"\b(?:Fla|Stat|Const|Ann|Admin|Ct|Cir|Supp)\.|\bDCA\b", name)):
         c["short_name"] = name
@@ -2570,8 +2713,6 @@ def lc_west_dca(ctx, rec):
             yield {"start": p["start"], "end": p["end"], "citation": c, "fix": f"({court} {date})".replace("  ", " ")}
 
 
-GOVERNING_STOP = {"see", "also", "cf.", "e.g.,", "accord", "compare", "contra", "but", "quoting", "citing", "and",
-                  "or", "&", "generally"}
 ROMAN = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10, "XI": 11,
          "XII": 12, "XIII": 13, "XIV": 14, "XV": 15, "XVI": 16, "XVII": 17, "XVIII": 18, "XIX": 19, "XX": 20,
          "XXI": 21, "XXII": 22, "XXIII": 23, "XXIV": 24, "XXV": 25, "XXVI": 26, "XXVII": 27}
@@ -2691,6 +2832,18 @@ SIGNAL_AFTER_SEMICOLON = re.compile(r"; (?P<sig>See(?: also| generally)?|Cf\.|Co
 SIGNAL_GAP = 20                  # characters between a citation's end and the semicolon (", (g)", " (emphasis added)")
 
 
+def lc_name_comma(ctx, rec):
+    norm = ctx["doc"].norm
+    for c in ctx["cites"]:
+        if not c.get("comma_missing") or c["in_quote"]:
+            continue
+        s = c["cite_start"]
+        a = norm.rfind(" ", 0, s - 1) + 1                 # the name's last word
+        b = s + re.match(r"\S+", norm[s:]).end()         # the volume
+        yield {"start": a, "end": b, "citation": c, "fix": norm[a:s - 1] + ", " + norm[s:b],
+               "authority": c["authority"] if c["tier"] == TIER_RULE else "9.800(p); Indigo Book R11.1"}
+
+
 def lc_signal_capital(ctx, rec):
     """A capitalized signal after a semicolon inside a citation sentence: a citation ends just before
     the semicolon, with no sentence end between."""
@@ -2708,33 +2861,37 @@ def lc_signal_capital(ctx, rec):
         yield {"start": a, "end": b, "fix": norm[a].lower() + norm[a + 1:b]}
 
 
-def _opens_sentence(norm, start):
-    """Does the sentence start at `start`, or after a short opener ("Similarly, ", "In addition, ")?"""
-    a = max(0, start - 60)
-    window = ("start. " if a == 0 else "") + norm[a:start]
-    # A sentence ends after a word of three or more letters, a number, or a parenthesis, not after a
-    # signal or an abbreviation ("Cf. ", "e.g. ", "Inc. ").
-    m = re.search(r"(?:\)|[a-z]{3}|\d)[.!?][\"'”’)\]]*\s(?:(?P<intro>[A-Z][a-z]+(?: [a-z]+){0,2}), )?$", window)
-    return bool(m) and (not m.group("intro") or not set(m.group("intro").lower().split()) & GOVERNING_STOP)
+# More of the same citation after it: "Fla. R. App. P. 9.330 or 9.331", "1.380(a)&(b)", "§ 1.01(2) and (3)",
+# "1.442(b), (c)".
+CITE_MORE = re.compile(r"(?:,\s?\(\w+\)(?:\(\w+\))*"
+                       r"|\s?(?:&|and|or|through|to|[-–])\s?(?:§+\s?)?(?:\(\w+\)|\d[\w\-–]*(?:\.\d[\w\-–]*)*)"
+                       r"(?:\(\w+\))*)*")
+# The sentence going on after a citation in the writer's words: after a comma (", the court ...", ",
+# provides"), or with none ("pursuant to § 1.01, Fla. Stat. for the hearing", "... 1.530(b) must be").
+# Not a signal, subsequent history, a list's next citation ("and § 2"), a committee's note, or "et seq.".
+GOES_ON = re.compile(r", (?!see\b|e\.g\.|aff'd|rev'd|cert\.|review|and\b|or\b|amended\b|repealed\b|renumbered\b"
+                     r"|transferred\b)[a-z]"
+                     r"| (?!(?:see|aff'd|rev'd|cert|review|amended|repealed|renumbered|transferred|advisory|committee"
+                     r"|cmt|et|nn?)\b)(?!(?:and|or)\b(?! [a-z]))[a-z][a-z']+")
 
 
 def lc_in_sentence(ctx, rec):
-    """Abbreviated forms used as an integral part of a sentence: the sentence going on after the citation
-    (", the court ...", ", provides"), and before it a governing word ("under", "of", "pursuant to") or
-    the sentence's start, where the citation is its subject ("Section 48.031, Fla. Stat., provides")."""
-    norm = ctx["doc"].norm
+    """Abbreviated forms used as an integral part of a sentence. The sentence layer's governing word
+    decides the part before the citation: a word of the writer's ("under", "of", "pursuant to", "that"),
+    or the sentence's start, where the citation is its subject ("Section 48.031, Fla. Stat., provides");
+    not a signal or a citation clause. After it, the sentence goes on in the writer's words, or, after a
+    governing word, ends with the citation ("relief under Fla. R. Civ. P. 1.540(b).")."""
+    doc = ctx["doc"]
+    norm, sents = doc.norm, doc.sentences
     for c in ctx["cites"]:
         if c["in_quote"] or c["kind"] not in ("constitution", "statute", "rule", "admin_code", "session_law") \
                 or c.get("form") not in ("abbreviated", "hybrid"):
             continue
-        before = norm[max(0, c["start"] - 40):c["start"]]
-        m = re.search(r"(?:^|[\s(])([A-Za-z][a-z]+)\s$", before)
-        if m and (m.group(1).lower() in GOVERNING_STOP or re.search(r",\s?with\s$", before)):
-            continue                       # a signal ("see", "compare ..., with"), not a governing word
-        if not m and not _opens_sentence(norm, c["start"]):
+        word = sents.governing_word(c["start"])
+        if word is None:
             continue
-        if not re.match(r", (?!see\b|e\.g\.|aff'd|rev'd|cert\.|review|and\b|or\b|amended\b|repealed\b|renumbered\b"
-                        r"|transferred\b)[a-z]", norm[c["end"]:c["end"] + 14]):
+        j = CITE_MORE.match(norm, c["end"]).end()
+        if not GOES_ON.match(norm, j) and not (word and sents.ends_at(j)):
             continue
         text = norm[c["start"]:c["end"]]
         fix = spelled_out(c, text, ctx["engine"].data)
@@ -2770,26 +2927,6 @@ def lc_case_name_typeface(ctx, rec):
 # Precision first: when the script can't tell what an Id. refers to, it says nothing about it.
 
 SEPARATE_OPINION = re.compile(r"\b[A-Z][A-Za-z'\-]+, (?:C\. )?J\., (?:dissenting|concurring|specially concurring)")
-
-
-PAREN_SENTENCE_END = re.compile(r"(?:\)|\b[a-z]{3,})[.!?] (?=[A-Z][a-z])")
-
-
-def _depth(text):
-    """Parentheses left open at the end of text. A sentence ending outside quotation marks closes any
-    left open, since a court's missing ')' would otherwise swallow the rest of the page."""
-    ends = {m.end() for m in PAREN_SENTENCE_END.finditer(text)}
-    d, quoted = 0, False
-    for i, ch in enumerate(text):
-        if ch == '"':
-            quoted = not quoted
-        elif ch == "(":
-            d += 1
-        elif ch == ")" and d:
-            d -= 1
-        if d and not quoted and i + 1 in ends:
-            d = 0
-    return d
 
 
 def _strip_parens(text):
@@ -2834,7 +2971,7 @@ def _name_matches(short, case_name):
     if not short or not case_name:
         return False
     s = " " + short.lower().rstrip(".,") + " "
-    return any(s in " " + re.sub(r"[,]", "", p.lower()) + " " for p in _parties(case_name))
+    return any(s in " " + re.sub(r"[,]", "", p.lower()).rstrip(".") + " " for p in _parties(case_name))
 
 
 def short_party(case_name):
@@ -2908,8 +3045,9 @@ def link_short_forms(doc, cites):
             c["nested_in"] = c["history_of"]
             continue
         if last is not None:
-            gap = norm[last["end"]:c["start"]]
-            if len(gap) <= 600 and _depth(gap) > 0:
+            # A parenthesis opened after it and still open (the bracket layer closes one a sentence end
+            # leaves open, since a court's missing ')' would otherwise swallow the rest of the page).
+            if c["start"] - last["end"] <= 600 and doc.brackets.depth(last["end"], c["start"]) > 0:
                 c["nested_in"] = last["index"]
                 continue
         top.append(c)
@@ -3088,8 +3226,10 @@ MIN_QUOTE_WORDS = 4               # shorter quotations are terms and scare quote
 QUOTE_SHOWN = 300
 SIGNAL = r"(?:(?:see|see also|accord|cf\.|but see|see generally)(?:,? e\.g\.,)?|e\.g\.,)\s+"
 QUOTE_THEN_CITE = re.compile(r"[\s.,;:!?\]\"']*(?:" + SIGNAL + r")?", re.I)
-# The rest of the quotation's sentence, then the citation sentence: '"..." and reversed. Smith, ...'
-SENTENCE_THEN_CITE = re.compile(r"[^.!?\"()]{0,250}[.!?][\"'\]]*\s+(?:" + SIGNAL + r")?", re.I)
+# What may come before a citation that opens its sentence: a signal, or nothing.
+SIGNAL_LEAD = re.compile(r"(?:" + SIGNAL + r")?", re.I)
+SENTENCE_REACH = 250              # how far past a quotation its sentence may run on before the citation sentence
+FRAME_REACH = 250                 # how far past a textual citation a quotation of its may open
 # Between a citation and the parenthetical holding a quotation, only other parentheticals:
 # '(Fla. 2015) (citation omitted) ("...")'
 PARENS_BETWEEN = re.compile(r"(?:\s*\((?:[^()]|\([^()]*\))*\))*\s*")
@@ -3099,7 +3239,6 @@ RECORD_AFTER = re.compile(r"[\s.,;:\"']*[(\[]?\s*(?:[Ss]ee |[Cc]f\. )?(?:" + REC
                           + r"|(?:[A-Z]{1,4}\.? ?)?R ?-\d+|S\.R\. ?\d+|(?:(?:Initial|Answer|Reply|Amended) )?"
                           r"(?:Pet(?:ition)?|Br(?:ief)?|Resp(?:onse)?|Mot(?:ion)?|IB|AB|RB)\.? at \d+)")
 END_MATTER = re.compile(r"\bCERTIFICATE OF (?:SERVICE|COMPLIANCE)\b")
-SENTENCE_BREAK = re.compile(r"[.!?][\"')\]]*\s+[A-Z]")
 
 
 def quotation_pin(c, cites, depth=0):
@@ -3200,27 +3339,12 @@ def _unclosed_quotes(norm, marks):
     return sorted(unclosed + [a for a, k in stack if k == "open"])
 
 
-def _open_paren(norm, i, reach=600):
-    """Offset of the parenthesis left open at norm[i], within reach, or None. A sentence end outside
-    any parenthesis stops the search."""
-    depth = 0
-    for j in range(i - 1, max(-1, i - reach), -1):
-        ch = norm[j]
-        if ch == ")":
-            depth += 1
-        elif ch == "(":
-            if depth == 0:
-                return j
-            depth -= 1
-        elif depth == 0 and ch in ".!?" and re.match(r" [A-Z\"“§]", norm[j + 1:j + 3]) \
-                and not re.search(r"(?:\b[A-Z][a-z]{0,3}|\bv|\bal|\bId|\bco|\bInc|\bU\.S)$", norm[max(0, j - 5):j]):
-            return None
-    return None
+PAREN_OPEN_REACH = 600          # how far back a '(' still open at a quotation or citation is looked for
 
 
 def tie_quotations(doc, cites):
     """Each quotation of MIN_QUOTE_WORDS or more, with the citation it's tied to (or none)."""
-    norm = doc.norm
+    norm, sents = doc.norm, doc.sentences
     blocks = list(doc.block_quotes)
     spans = [(a, e, True) for a, e in blocks]
     for a, b in doc.quotes:
@@ -3243,7 +3367,7 @@ def tie_quotations(doc, cites):
              "refers_to": None, "pin": None, "no_pin": False, "note": None, "_start": a, "_end": e}
         stream = doc.stream(a)
         # 1. A quotation inside a citation's explanatory parenthetical: '(Fla. 2015) (holding that "...")'.
-        opened = None if block else _open_paren(norm, a - 1)
+        opened = None if block else doc.brackets.open_paren(a - 1, reach=PAREN_OPEN_REACH)
         if opened is not None:
             k = bisect.bisect_right(starts, opened) - 1
             while k >= 0 and usable[k]["end"] > opened:
@@ -3260,24 +3384,50 @@ def tie_quotations(doc, cites):
                 c, gap = usable[k], norm[close:usable[k]["start"]]
                 if QUOTE_THEN_CITE.fullmatch(gap):
                     q["citation"], q["attributed_by"] = c["index"], "follows"
-                elif (not block and SENTENCE_THEN_CITE.fullmatch(gap) and not RECORD_RX.search(gap)
-                      and re.match(r"[,;:]?\s+[a-z]", gap) and not re.search(r"[.!?]['’]?$", text)):
-                    # the quotation's own sentence goes on, then ends with the citation sentence
-                    q["citation"], q["attributed_by"] = c["index"], "end of sentence"
+                elif (not block and not RECORD_RX.search(gap) and re.match(r"[,;:]?\s+[a-z]", gap)
+                      and sents.same_sentence(close - 1, close)):
+                    # the quotation's own sentence goes on, then ends, and the citation opens the next:
+                    # '"..." and reversed. Smith, ...'. No other quotation or parenthesis on the way.
+                    end = sents.end(close)
+                    if (end is not None and end - close <= SENTENCE_REACH and not re.search(r"[\"()]", norm[close:end])
+                            and sents.index(c["start"]) == sents.index(end) + 1
+                            and SIGNAL_LEAD.fullmatch(norm[sents.start(c["start"]):c["start"]])):
+                        q["citation"], q["attributed_by"] = c["index"], "end of sentence"
             if q["citation"] is None and RECORD_AFTER.match(norm, close):
                 q["note"] = "followed by a record cite: the source is the record, not case law"
         out.append(q)
     # 3. Quotations in one sentence share its citation: '"The statute," the court said, "is clear." Smith, ...'
-    # Not across a sentence end, whether inside the first quotation ('"... harmless." It held that "..."') or
-    # right before the next one opens ('... in the motion. "[W]e ..."').
+    # Not across a sentence end (fl_sentence.Sentences), whether it ends the first quotation ('"... harmless."
+    # It held that "..."') or comes right before the next one opens ('... in the motion. "[W]e ..."').
     for i in range(len(out) - 2, -1, -1):
         q, nxt = out[i], out[i + 1]
         if q["citation"] is None and not q["note"] and not q["block"] and not nxt["block"]:
             gap = norm[q["_end"] + 1:nxt["_start"] - 1]
-            ended = re.search(r"[.!?]['\])]*$", norm[q["_start"]:q["_end"]]) or re.search(r"[.!?]['\")\]]*\s*$", gap)
-            if (len(gap) <= 120 and not SENTENCE_BREAK.search(gap) and not ended and not re.search(r"[()]", gap)
-                    and nxt["citation"] is not None):
+            if (len(gap) <= 120 and not re.search(r"[()]", gap) and nxt["citation"] is not None
+                    and sents.same_sentence(q["_end"], nxt["_start"] - 1)):
                 q["citation"], q["attributed_by"] = nxt["citation"], "same sentence"
+    # 4. A quotation after a textual citation that frames its clause (fl_sentence.Sentences.frames): 'In Able v.
+    # Baker, 1 So. 3d 2 (Fla. 2001), the court held that "..."'; 'Section 1, Fla. Stat., provides that "..."'.
+    # In the citation's clause, with no record cite and no quotation tied elsewhere between, and no citation
+    # after it in its sentence, whose quotation it might be. Not an Id., which the writer's words never name.
+    tops = [c for c in usable if c.get("nested_in") is None]
+    top_ends = [c["end"] for c in tops]
+    for q in out:
+        if q["citation"] is not None or q["note"] or q["block"]:
+            continue
+        o = q["_start"] - 1                      # the opening mark
+        k = bisect.bisect_right(top_ends, o) - 1
+        if k < 0:
+            continue
+        c = tops[k]
+        nxt = tops[k + 1] if k + 1 < len(tops) else None
+        if (c["kind"] == "id" or o - c["end"] > FRAME_REACH or doc.stream(c["start"]) != doc.stream(o)
+                or not sents.same_sentence(c["end"] - 1, o) or sents.clause_start(o) != sents.clause_start(c["start"])
+                or not sents.frames(c["start"]) or RECORD_RX.search(norm, c["end"], o)
+                or (nxt is not None and sents.same_sentence(q["_end"], nxt["start"]))
+                or any(c["end"] <= p["_start"] < o and p["citation"] != c["index"] for p in out)):
+            continue
+        q["citation"], q["attributed_by"] = c["index"], "textual citation"
     for q in out:
         q.pop("_start"), q.pop("_end")
         if q["citation"] is None:
@@ -3302,25 +3452,16 @@ PAREN_KINDS = ("case", "statute", "constitution", "rule", "admin_code", "session
 PAREN_REACH = 1000
 
 
-def _sentence_end(norm, j):
-    """Does norm[j] end a citation sentence: a period after ')', a page number, or a lowercase word (not an
-    abbreviation like 'Fla.' or 'v.'), then a new sentence, perhaps after a footnote marker ('relief).19 In')?"""
-    m = re.search(r"(?:\)|\d|\b([a-z]{3,}))$", norm[max(0, j - 30):j])
-    return (norm[j] in ".!?" and m is not None and m.group(1) not in LOWER_ABBREVIATIONS
-            and re.match(r"\d{0,3}\s+[A-Z\d\"(§]|\s*$", norm[j + 1:j + 7]) is not None)
-
-
-LOWER_ABBREVIATIONS = {"eff", "cert", "etc", "rev", "supp", "approx", "art", "ann", "app", "dist", "cir", "reh'g",
-                       "amend", "repl", "corr", "dep't", "env't", "gov't", "nat'l", "int'l", "ass'n", "sess", "vol"}
-
-
 def lc_paren_unbalanced(ctx, rec):
-    """Parentheses that don't pair, counted from a citation's start through its parentheticals and history
-    to the end of its citation sentence (a semicolon outside any parenthetical, or a sentence end outside
-    quotation marks). A parenthetical opened before the citation ("(see ...)", "(citing ...)") may close in
-    it. A statute or rule number that runs into a subsection the script can't read is reported too."""
+    """Parentheses that don't pair, from a citation's start through its parentheticals and history to the
+    end of its clause (fl_sentence.Clauses: a semicolon or a sentence end, outside quotation marks, at the
+    citation's own depth). Pairing is the bracket layer's: a ')' may close a parenthetical opened before
+    the citation ("(see ...)", "(citing ...)"), and a '(' that a sentence end closes was never closed. A
+    statute or rule number that runs into a subsection the script can't read is reported too."""
     doc = ctx["doc"]
     norm, reported = doc.norm, set()
+    clauses = doc.clauses
+    br = clauses.brackets
     for c in ctx["cites"]:
         if (c["kind"] not in PAREN_KINDS or c["in_quote"] or c.get("nested_in") is not None or c["tier"] != TIER_RULE
                 or c.get("toa")):
@@ -3330,49 +3471,39 @@ def lc_paren_unbalanced(ctx, rec):
                    "detail": f"The subsection after {c.get('section') or c.get('number')} can't be read, so no fix "
                              "touches it; fix it by hand."}
             continue
-        outer = 1 if _open_paren(norm, c["start"]) is not None else 0
-        stop = min(len(norm), c["start"] + PAREN_REACH)
-        quoted = [(a, b) for a, b in doc.quotes if a < stop and b > c["start"]]
-        opened, bad, j = [], None, c["start"]
-        if re.match(r"\s+[A-Z]", norm[c["end"]:c["end"] + 2]) and norm[c["end"] - 1] == ".":
-            stop = c["end"]                        # "..., Fla. Stat. At sentencing": the sentence ended
-        while j < stop:
-            ch = norm[j]
-            if ch in "();." and any(a < j < b for a, b in quoted):
-                pass                               # inside a quotation: the quoted writer's punctuation
-            elif ch == "(":
-                opened.append(j)
-            elif ch == ")":
-                if opened:
-                    opened.pop()
-                elif outer:
-                    outer = 0                      # closes the parenthetical the citation sits in
-                elif bad is None:
-                    bad = ("extra", j)
-            elif (ch == ";" and not opened) or (j >= c["end"] and _sentence_end(norm, j)):
+        # A sentence end counts from the citation's own last period: "..., Fla. Stat. At sentencing".
+        j = clauses.clause_end(c["start"], after=c["end"] - 1, reach=PAREN_REACH)
+        end = min(len(norm), c["start"] + PAREN_REACH) if j is None else max(j, c["end"])
+        bad = None
+        for k in br.stray[bisect.bisect_left(br.stray, c["start"]):bisect.bisect_left(br.stray, end)]:
+            if not br.quoted(k):               # inside a quotation: the quoted writer's punctuation
+                bad = ("extra", k)
                 break
-            j += 1
-        if bad is None and opened and j < len(norm) and j < c["start"] + PAREN_REACH:
-            bad = ("open", opened[-1])
+        if bad is None and j is not None:      # a clause that runs past the reach may close later
+            opens = [o for o in br.unclosed[bisect.bisect_left(br.unclosed, c["start"]):bisect.bisect_left(br.unclosed, end)]
+                     if not br.quoted(o)]
+            if opens:
+                bad = ("open", opens[-1])
         if bad is None or bad[1] in reported:
             continue
-        region = norm[c["start"]:j]
+        region = norm[c["start"]:end]
         if (re.search(r"(?:\. ?){6,}|…{3,}|_{4,}|\)\.*\s*\d{1,3}(?:\s*,\s*\d{1,3}){2,}", region)   # a table of authorities
-                or any(c["start"] <= u < j for u in doc.unclosed_quotes)      # quote-unclosed reports the cause
-                or doc.location(c["start"], j).get("split_to_page")            # a page break or moved footnote
-                or any(c["start"] < b and a < j for a, b in doc.footnotes)):  # can scramble the text
+                or any(c["start"] <= u < end for u in doc.unclosed_quotes)      # quote-unclosed reports the cause
+                or doc.location(c["start"], end).get("split_to_page")            # a page break or moved footnote
+                or any(c["start"] < b and a < end for a, b in doc.footnotes)):  # can scramble the text
             continue
         reported.add(bad[1])
         what, k = bad
         detail = (f"A ')' closes nothing: …{norm[max(c['start'], k - 30):k + 1]}" if what == "extra"
                   else f"A '(' is never closed: {norm[k:k + 30]}…")
-        yield {"start": c["start"], "end": max(c["end"], k + 1) if what == "extra" else j, "citation": c,
+        yield {"start": c["start"], "end": max(c["end"], k + 1) if what == "extra" else end, "citation": c,
                "authority": c["authority"], "detail": detail}
 
 
-def _in_citation_parenthetical(norm, i, cites):
+def _in_citation_parenthetical(doc, i, cites):
     """Is offset i inside a parenthetical that follows a citation: '(Fla. 2015) (holding that "...'?"""
-    p = _open_paren(norm, i)
+    norm = doc.norm
+    p = doc.brackets.open_paren(i, reach=PAREN_OPEN_REACH)
     return p is not None and any(c["end"] <= p and not c["in_quote"] and PARENS_BETWEEN.fullmatch(norm[c["end"]:p])
                                  for c in cites)
 
@@ -3390,7 +3521,7 @@ def lc_quote_unclosed(ctx, rec):
         k = bisect.bisect_right(opens, i)
         limit = min(opens[k] if k < len(opens) else len(norm), i + fc.MAX_QUOTE)
         after = next((c for c in cites if i < c["start"] < limit and not c["in_quote"]), None)
-        if after is None and not _in_citation_parenthetical(norm, i, cites):
+        if after is None and not _in_citation_parenthetical(doc, i, cites):
             continue
         end = after["start"] if after else limit
         if doc.location(i, end).get("split_to_page") or any(i < b and a < end for a, b in doc.footnotes):
@@ -3511,6 +3642,23 @@ def lc_short_volume(ctx, rec):
         fix = f"{c['short_name']}, {r['volume']} {r['canonical']} at {c['pin']}"
         yield {"start": c["start"], "end": c["end"], "citation": c, "fix": fix,
                "detail": f"The full citation of {f['case_name']} gives volume {r['volume']}."}
+
+
+def lc_short_missing_at(ctx, rec):
+    cites = ctx["cites"]
+    for c in cites:
+        if not c.get("missing_at") or c["in_quote"] or c.get("toa"):
+            continue
+        r = c["reporters"][0]
+        f = cites[c["refers_to"]] if c.get("refers_to") is not None else None
+        first, n = (_first_page(f, r["canonical"]) if f else None), _number(c["pin"])
+        if first is not None and n is not None and n > first:
+            yield {"start": r["start"], "end": c["end"], "citation": c,
+                   "fix": f"{r['volume']} {r['reporter']} at {c['pin']}"}
+        else:                              # the first page: a pinpoint to it, or the case as a whole?
+            yield {"start": r["start"], "end": c["end"], "citation": c,
+                   "detail": "It gives the case's first page, so no fix is offered: if that's the pinpoint, add "
+                             "\"at\"; if it means the case as a whole, give a pinpoint or the full citation."}
 
 
 def lc_supra_case(ctx, rec):

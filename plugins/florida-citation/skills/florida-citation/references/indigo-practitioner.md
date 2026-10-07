@@ -195,6 +195,7 @@ For Florida ones, use Rule 9.800 (`fl_cite.py rule f`, `rule j`, `rule e`) and `
 | A short form before the full citation, or with no full citation at all | R15.2.1 |
 | A full citation repeated on the same page, where a short form would do | R15.2.1 |
 | A short form whose volume differs from the full citation's | R15.2.2 |
+| A short form missing `at` (`Fenelon, 594 So. 2d 294.`) | R15.2.2 |
 | Spacing in a reporter Rule 9.800 doesn't name (`N.E. 2d`, `F. R. D.`) | T1.1, T3 |
 | `at` before a pinpoint in a full citation (`292 at 293`); no space after the comma (`292,293`) | R11.1 |
 | A quotation from a case whose citation gives no page | R11.7 |

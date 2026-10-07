@@ -46,7 +46,7 @@ What it checks, beyond abbreviations and spacing:
 - **Date-dependent forms.** Old case numbers after September 1, 2026; Florida Law Weekly cites old enough to have a Southern Reporter cite; a statute year in the future; a Supreme Court case cited to S. Ct. alone years after it would be in U.S. Reports. The document's date comes from `--date`, else the e-filing stamp or the caption, else today, and the report says which.
 - **Westlaw and LEXIS cites** without the docket number the rule pairs with them, or with that number missing its `No.`
 - **Spelled-out forms:** "§ 48.031, Fla. Stat." used as part of a sentence, where the rule wants "section 48.031, Florida Statutes," and "Florida Constitution Article IV, § 8" for "article IV, section 8 of the Florida Constitution."
-- **Pinpoints and dates in full citations:** `594 So. 2d 292 at 293` for `292, 293`; `(Fla.1992)` with no space; a month and day on a case published in a reporter, where the year alone belongs (a date that doesn't fit can mean a different ruling in the same case).
+- **Pinpoints and dates in full citations:** `594 So. 2d 292 at 293` for `292, 293`; a case name with no comma before the volume (`Doe v. Roe, Inc. 594 So. 2d 292`); `(Fla.1992)` with no space; a month and day on a case published in a reporter, where the year alone belongs (a date that doesn't fit can mean a different ruling in the same case).
 - **Court parentheticals in a database's style:** Westlaw's `(Fla. App. 4th Dist. 2012)` for `(Fla. 4th DCA 2012)`, and `4thDCA` run together.
 - **Punctuation that hides where a citation ends** (to check): parentheses that don't pair, a quotation mark that opens and never closes before a citation, and a statute subsection that can't be read, for which no fix is offered rather than one that drops it.
 - **Quotations without a page** (to check): a quotation from a case whose citation gives no pinpoint, directly, through Id., or through a short form. A defined term in a parenthetical, `(the "Agreement")`, isn't taken for a quotation.
@@ -57,6 +57,7 @@ What it checks, beyond abbreviations and spacing:
   - an Id. whose pinpoint doesn't fit what it refers to (a page after a statute);
   - a short form before the case's full citation, or for a case never cited in full;
   - a short form whose volume differs from the full citation's;
+  - a short form missing `at` (`Fenelon, 594 So. 2d 294.` after the full citation);
   - a pinpoint before the case's first page;
   - supra used for a case;
   - a full citation repeated on the same page where a short form would do.

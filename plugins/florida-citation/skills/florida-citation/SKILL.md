@@ -53,7 +53,7 @@ Short forms are checked across the whole document. Rule 9.800 has none of its ow
 
 - `Id` with no period, and `ibid.` (errors).
 - An Id. after a string citation, or one whose pinpoint doesn't fit what it refers to: a page after a statute, a section after a case.
-- A short form before the case's first full citation, a short form for a case never cited in full, and a short form whose volume differs from the full citation's.
+- A short form before the case's first full citation, a short form for a case never cited in full, a short form whose volume differs from the full citation's, and a short form missing `at` (`Fenelon, 594 So. 2d 294.`).
 - A pinpoint before the case's first page.
 - `supra` used for a case. Books and articles are left alone.
 - A full citation repeated on the same page, within about ten citations, where a short form would do.

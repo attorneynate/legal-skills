@@ -331,7 +331,7 @@
 
     {"id": "spelled-out-in-sentence", "authority": "9.800 (introductory paragraph)", "severity": "check", "kind": "logic", "logic": "in_sentence",
      "message": "Citation forms (other than case reporters) are spelled out when they are an integral part of a sentence; whether one is takes judgment.",
-     "examples": {"match": ["Under Art. V, § 3(b)(3), Fla. Const., the Court may review the decision."], "no_match": ["Article V, section 3(b)(3) of the Florida Constitution sets out the Court's jurisdiction."]}},
+     "examples": {"match": ["Under Art. V, § 3(b)(3), Fla. Const., the Court may review the decision.", "The court may extend the time under Fla. R. Civ. P. 1.090(b).", "The tenant argues that § 83.56, Fla. Stat. does not apply."], "no_match": ["Article V, section 3(b)(3) of the Florida Constitution sets out the Court's jurisdiction.", "The tenant moved out. § 83.56, Fla. Stat.", "Compare § 83.56, Fla. Stat. with § 83.57, Fla. Stat."]}},
 
     {"id": "p-other-citations", "authority": "9.800(p)", "severity": "check", "kind": "none",
      "message": "Citations the rule doesn't cover follow the Bluebook (checked here through the Indigo Book), then the Florida Style Manual for Florida materials neither covers (bills, staff analyses, legislative journals, executive orders).",
@@ -355,6 +355,11 @@
      "pattern": "(\\((?:[^()]{0,60}? )?(?:[A-Z][A-Za-z.]*\\.|DCA))((?:1[6-9]|20)\\d\\d\\))", "fix": "\\1 \\2",
      "message": "A space comes before the year in a court's date parenthetical: (Fla. 1992), (11th Cir. 2012). In OCR'd text, compare the original; the space may have been lost in scanning.",
      "examples": {"match": ["Doe v. Roe, 594 So. 2d 292 (Fla.1992).", "Doe v. Roe, 700 F.3d 100 (11th Cir.2012).", "Doe v. Roe, 500 F. Supp. 2d 100 (S.D. Fla.2007).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA1983)."], "no_match": ["Doe v. Roe, 594 So. 2d 292 (Fla. 1992).", "Doe v. Roe, 40 So. 100 (1928).", "Doe v. Roe, 815 So. 2d 100 (Fla. 3d DCA Mar. 6,2002).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA 1983)."]}},
+
+    {"id": "case-name-comma", "authority": "9.800", "severity": "error", "kind": "logic", "logic": "name_comma",
+     "message": "A comma follows the case name, before the volume: Fenelon v. State, 594 So. 2d 292 (Fla. 1992).",
+     "examples": {"match": ["See Doe v. Roe, Inc. 594 So. 2d 292 (Fla. 1992).", "Doe v. State 594 So. 2d 292 (Fla. 1992)."],
+                  "no_match": ["See Doe v. Roe, Inc., 594 So. 2d 292 (Fla. 1992).", "Doe v. Roe, 594 So. 2d 292 (Fla. 1992), aff'd 600 So. 2d 1 (Fla. 1993)."]}},
 
     {"id": "paren-unbalanced", "authority": "9.800", "severity": "check", "kind": "logic", "logic": "paren_unbalanced",
      "message": "The parentheses in this citation don't pair, so a parenthetical or subsection may be cut off or run on; check where each one should close.",
@@ -421,6 +426,12 @@
      "message": "A short form's volume differs from the one in the case's full citation.",
      "examples": {"match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Sansone v. United States, 380 U.S. 343 (1965). Fenelon, 549 So. 2d at 294."],
                   "no_match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Sansone v. United States, 380 U.S. 343 (1965). Fenelon, 594 So. 2d at 294."]}},
+
+    {"id": "short-missing-at", "authority": "Indigo Book R15.2.2", "severity": "error", "kind": "logic", "logic": "short_missing_at", "tier": "bluebook",
+     "message": "A short form takes \"at\" before its pinpoint: Fenelon, 594 So. 2d at 293. Without it, this reads as a full citation missing its court and year.",
+     "examples": {"match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). The court agreed. Fenelon, 594 So. 2d 294."],
+                  "no_match": ["Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). The court agreed. Fenelon, 594 So. 2d at 294.",
+                               "Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). The court agreed. Doe v. Roe, 594 So. 2d 300."]}},
 
     {"id": "supra-case", "authority": "Indigo Book R6.2.3", "severity": "check", "kind": "logic", "logic": "supra_case", "tier": "bluebook",
      "message": "The Bluebook system doesn't use supra for cases; use the case's short form. Florida courts sometimes do, so this is a check, not an error.",

@@ -1,5 +1,9 @@
 # Changelog
 
+## florida-citation 1.2.0 (2026-10-06)
+
+Two new checks: a short form missing "at" (Fenelon, 594 So. 2d 294.), and a case name with no comma before the volume (Doe v. Roe, Inc. 594 So. 2d 292). An abbreviated statute or rule cited as part of a sentence is now also caught when it ends the sentence ("as required by § 48.031, Fla. Stat.") or when the sentence goes on after it with no comma. A quotation introduced by a citation ("In Smith, 594 So. 2d 292, the court held that '...'") is now tied to that citation, so a quotation with no page is reported there too. Case names that were lost before are read (a rule number inside a name, "Ctys.", "Inc. etc. v."), and a short form's name no longer runs back into the sentence before it.
+
 ## florida-citation 1.1.2 (2026-10-05)
 
 A rule citation after "to" or "of" (pursuant to Fla.R.Crim.P. 3.852) is checked again; only a rule named inside a case name, followed by that case's citation, is skipped.
