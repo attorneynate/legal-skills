@@ -32,11 +32,13 @@ Every answer and every finding names its authority, in the order Rule 9.800(p) s
 
 ### Checks your own brief or motion
 
-It reads `.txt`, `.md`, `.docx` (footnotes included), and `.pdf`. It finds every case, statute, constitution, rule, Administrative Code, session-law, and Attorney General citation; decides which tier governs each; and reports three kinds of finding:
+It reads `.txt`, `.md`, `.docx` (footnotes included), and `.pdf`. It finds every case, statute, constitution, rule, Administrative Code, session-law, and Attorney General citation, and documents from other cases cited in full (`Def.'s Mot. to Dismiss at 4, Able v. Baker, No. 1:20-cv-1 (S.D. Fla. Mar. 1, 2021)`); decides which tier governs each; and reports three kinds of finding:
 
-- **Error:** clearly departs from Rule 9.800's form. Examples: `So.2d`, `Fla. 3rd DCA`, `F.S. 48.031`, `§ 48.031, Fla. Stat. Ann.`, `AGO 73-178`, `Id` without its period.
-- **Check:** probably wrong, or right only in some contexts, so the agent or you decide. Examples: no year on a Florida Statutes citation (reported once per document, since courts often leave it off), an old-form case number, a Florida Law Weekly cite more than a year old, an abbreviated form used inside a sentence.
+- **Error:** clearly departs from Rule 9.800's form. Examples: `So.2d`, `Fla. 3rd DCA`, `F.S. 48.031`, `§ 48.031, Fla. Stat. Ann.`, `AGO 73-178`, `Id` without its period, a filing from another case with its pinpoint after the case's parenthetical instead of after its title.
+- **Check:** probably wrong, or right only in some contexts, so the agent or you decide. Examples: no year on a Florida Statutes citation (reported once per document, since courts often leave it off), an old-form case number, a Florida Law Weekly cite more than a year old, an abbreviated form used inside a sentence, an Id. for a filing from another case.
 - **Unrecognized:** a citation outside the script's forms, listed under the tier that governs it for the agent to check by hand. Cases in reporters the rule doesn't name (the regional reporters, F.R.D., B.R., Fed. Cl., T.C.) are listed here too, but the script still reads them, so their Id. citations are checked and their spacing (`N.E. 2d`) is an error.
+
+**What it doesn't read, it counts.** Anything else that looks like a citation (a secondary source, a legislative document, a web page, a filing, or a citation in a form the script doesn't know) gets no check, so the report says how many such passages there are and on which pages, with record and transcript cites counted on a line of their own. Exhibits, the certificates, and the table of authorities are left out of the count. So "no finding" means checked and fine, not never read.
 
 Each finding gives its location, the authority (a subdivision of Rule 9.800 or an Indigo Book rule number), what was found, and the fix. In a PDF, the location is the brief's printed page number, as in `p. 12 (PDF p. 19)`; in a Word file, the paragraph or footnote. A repeated error (`So.2d` forty times) is reported once with its count and every location.
 
@@ -56,6 +58,7 @@ What it checks, beyond abbreviations and spacing:
   - an Id. after a string citation;
   - an Id. whose pinpoint doesn't fit what it refers to (a page after a statute);
   - a short form before the case's full citation, or for a case never cited in full;
+  - a section cited without its code (`See § 48.031(2).`) before the code's first full citation, and a constitution cited without its name (`Art. V, § 6(b)`), which has no short form;
   - a short form whose volume differs from the full citation's;
   - a short form missing `at` (`Fenelon, 594 So. 2d 294.` after the full citation);
   - a pinpoint before the case's first page;
@@ -72,11 +75,14 @@ In someone else's brief, a citation that's wrong in substance matters far more t
 3. **Quotations to verify:** every quotation of four words or more, tied to the citation that gives its source and that citation's pinpoint, for the agent to check with a quote-verification tool, or by fetching each source by citation and comparing locally, which keeps a confidential filing's text private. A quotation whose citation gives no page is marked. Quotations with no citation (often record quotes) are listed separately.
 4. **Form errors,** summarized last by check and authority, since they're rarely worth raising.
 
+The count of what the script doesn't read heads the report, since in another side's filing those authorities are the ones to look up by hand.
+
 The facts loop:
 
 - The skill lists each case once, as a citation alone, for a citation tool that checks a whole list in one request (CourtListener's citation lookup takes up to 250 at a time). The list holds nothing from the brief but its citations.
 - The agent looks up, one at a time, only the cases that tool doesn't find, and records what it finds in a facts file the skill writes (full citations, short forms, and Id. merged, with what the brief claims).
 - The skill compares claim with finding and does the page arithmetic.
+- Filings from other cases (a brief or motion cited by its case's docket) aren't cases, so they're left out of the list and the lookups, and listed apart, under the facts, to confirm by docket if needed.
 
 **What it costs.** The script's report is free: it runs offline in about a second. Confirming cases costs case-law lookups, and a free tier allows only so many (CourtListener's: a few a minute, about a hundred a day), which is why the batch comes first. Verifying a quotation means reading its source, often several thousand tokens each. So the agent gives you the free report first, says what confirming the cases and the quotations would take, and goes only as far as you choose.
 
@@ -89,8 +95,11 @@ The judgment stays with the agent and the arithmetic with the script. The report
 - **Form, not substance.** It doesn't decide whether a case exists, supports the point it's cited for, or is still good law. The facts loop compares what a case-law tool finds with what the brief claims; the lookup is the agent's, with its own tools.
 - **Practitioner forms only.** No law-review typefaces or footnote conventions.
 - **Precision over recall.** It flags only what it can tell is a departure; a checker that flags correct citations gets ignored. So it skips, by design:
+  - citations outside its forms that it can't read at all (secondary sources, legislative documents, web pages, filings): counted, with their pages, as above;
   - citations inside quotation marks or block quotes (they're the quoted writer's form; the report counts them, with their pages);
-  - an Id. whose antecedent it can't see: after a record cite, a quotation, an unrecognized citation, or a page split. These are counted in the report.
+  - an Id. whose antecedent it can't see: after something that looks like an authority it didn't read (a record cite, a report or web page, a filing, an unrecognized citation), a quotation, or a page split. These are counted in the report;
+  - a quotation's source across such an authority: the quotation is listed with no citation rather than tied to the wrong one;
+  - pinpoint checks on a citation whose page may come after what it read (`..., 2020 WL 1234567 (M.D. Fla. Mar. 1, 2020), at 19`).
 - **Record citations are checked only for form.** `(R. 45)` and appendix cites follow each court's own practice, so the script reports only the paragraph-sign and Id. forms above, as things to check, and never whether a record cite points where it should.
 - **The Bluebook system is checked through the Indigo Book,** which tracks an earlier Bluebook edition. The 22nd edition's changes are listed for the agent, but the script's short-form checks follow the Indigo Book's rules. The skill quotes no Bluebook text.
 - **It doesn't edit your file.** It reports locations and fixes; you or your agent make the changes.

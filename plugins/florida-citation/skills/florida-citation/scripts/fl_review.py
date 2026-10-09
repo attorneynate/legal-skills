@@ -84,7 +84,9 @@ def case_entries(report):
             entries[k] = {"cite": c["cite"], "full": [], "mentions": []}
             order.append(k)
         entries[k]["full"].append(c)
-        entries[k]["mentions"].append({"citation": c, "pins": _primary_pins(c), "form": "full"})
+        # A citation whose pinpoint may be in text the script didn't read (fl_check.unread_pin): not checked.
+        pins = [] if fl_check.unread_pin(c) else _primary_pins(c)
+        entries[k]["mentions"].append({"citation": c, "pins": pins, "form": "full"})
     for c in cites:
         if c["kind"] not in ("case_short", "id", "supra") or c["in_quote"] or c.get("toa"):
             continue
@@ -94,8 +96,8 @@ def case_entries(report):
         e = entries.get(_key(full.get("cite")))
         if e is None:
             continue
-        pin = c.get("pin")
-        if c["kind"] == "id":
+        pin = None if fl_check.unread_pin(c) else c.get("pin")
+        if c["kind"] == "id" and pin:
             pin = re.sub(r"^at ", "", pin) if pin and c.get("pin_kind") == "page" else None
         series = _series(e["cite"])
         if c["kind"] == "case_short" and series and c["reporters"]:
@@ -113,6 +115,48 @@ def case_entries(report):
     return [entries[k] for k in order]
 
 
+def court_documents(report):
+    """One entry per document from another case the document cites (fl_check's court_document: "Initial Br.
+    at 12, Able v. State, No. SC2020-1 (Fla. 2020)"), with the Ids that refer to it, in order of first
+    citation. They aren't cases, so they stay out of the case lookup (case_entries, cite_list); confirming
+    one means finding it on its case's docket."""
+    cites = report["citations"]
+    entries, order = {}, []
+    for c in cites:
+        if c["kind"] != "court_document" or c["in_quote"] or c.get("toa"):
+            continue
+        # The same filing: its title, and its docket's letters and digits ("4:11-cv-00083" and "4:11-cv00083").
+        k = (c.get("document"), re.sub(r"[\W_]", "", (c.get("cite") or "").lower()))
+        if k not in entries:
+            paren = c.get("paren") or {}
+            entries[k] = {"document": c.get("document"), "case_name": c.get("case_name"),
+                          "docket": (c.get("docket") or {}).get("text"), "court": paren.get("court_text") or None,
+                          "date": paren.get("date") or paren.get("year"), "pinpoints": [], "cited_at": [],
+                          "text": c["text"], "citation": c["index"], "location": c["location"], "_index": set()}
+            order.append(k)
+        entries[k]["_index"].add(c["index"])
+    for c in cites:
+        if c["in_quote"] or c.get("toa"):
+            continue
+        for k in order:
+            e = entries[k]
+            if c["index"] in e["_index"] or (c["kind"] == "id" and c.get("refers_to") in e["_index"]):
+                pin = None if fl_check.unread_pin(c) else c.get("pin")
+                if pin and c["kind"] == "id":
+                    pin = re.sub(r"^at ", "", pin)
+                if pin and pin not in e["pinpoints"]:
+                    e["pinpoints"].append(pin)
+                w = fl_check._where(c["location"])
+                if w not in e["cited_at"]:
+                    e["cited_at"].append(w)
+    out = []
+    for k in order:
+        e = entries[k]
+        e.pop("_index")
+        out.append(e)
+    return out
+
+
 def cite_list(report):
     """Each case once, as a citation alone (name, cite, court and year), one per line: what a citation
     tool that checks a whole list in one request needs, and nothing else from the document."""
@@ -122,6 +166,11 @@ def cite_list(report):
         paren = " ".join(str(x) for x in (c["court"], c["year"]) if x)
         lines.append((f"{c['case_name']}, " if c["case_name"] else "") + e["cite"] + (f" ({paren})" if paren else ""))
     return "\n".join(lines)
+
+
+DOCUMENTS_ABOUT = ("Filings from other cases (a brief, motion, or order cited by its case's docket). They aren't "
+                   "cases, so they aren't looked up with the cases; confirm one by its docket if needed. Ignored "
+                   "when read back.")
 
 
 def facts_template(report):
@@ -146,6 +195,11 @@ def facts_template(report):
         entry = {"cite": e["cite"], "claimed": claimed}
         entry.update({f: None for f in FIELDS})
         out["cases"].append(entry)
+    docs = court_documents(report)
+    if docs:
+        out["court_documents_about"] = DOCUMENTS_ABOUT
+        out["court_documents"] = [{k: v for k, v in d.items() if k not in ("text", "citation", "location")}
+                                  for d in docs]
     return out
 
 
@@ -484,7 +538,8 @@ def opposing(report):
     for f in report["findings"]:
         if f["severity"] == "unrecognized":
             unrec[f["tier"]] = unrec.get(f["tier"], 0) + 1
-    report["opposing"] = {"facts_confirmed": bool(facts), "facts": section1, "pinpoints": section2,
+    report["opposing"] = {"facts_confirmed": bool(facts), "facts": section1, "court_documents": court_documents(report),
+                          "pinpoints": section2,
                           "quotations": attributed, "unattributed_quotations": unattributed,
                           "form": form_groups, "unrecognized": unrec}
     return report
@@ -512,6 +567,9 @@ def render_opposing(report, facts_path=None):
     if app:
         out.append(f"Exhibits? {app['label']} {app['why']}. To review only the filing, rerun with "
                    f"--last-page {app['page'] - 1}.")
+    # What the script didn't read: in another side's filing, authorities to look up by hand.
+    counted = fl_check.unread_notes(report.get("unread", []))
+    out += counted
     facts = report.get("facts")
     if facts:
         n = facts["counts"]
@@ -533,6 +591,7 @@ def render_opposing(report, facts_path=None):
         out.append(f"   {it['where']:<20} {_clip(it['text'], 110)}")
         out.append(f"   {'':<20} {it['message']}  (from {it['basis']})")
     out += _not_in_databases(facts, "   ")
+    out += _court_documents(o["court_documents"], "   ")
 
     out.append("")
     out.append("2. PINPOINTS OUT OF RANGE")
@@ -549,7 +608,10 @@ def render_opposing(report, facts_path=None):
                    + (" ..." if len(cases) > 8 else ""))
 
     out.append("")
-    out.append(f"3. QUOTATIONS TO VERIFY ({len(o['quotations'])} tied to a citation; check each against its source "
+    blind = sum(1 for q in o["quotations"] if q["note"])
+    out.append(f"3. QUOTATIONS TO VERIFY ({len(o['quotations'])} tied to a citation"
+               + (f", {blind} of them through an Id. or short form the script can't trace" if blind else "")
+               + "; check each against its source "
                "with a quote tool, or by fetching the source by citation, which keeps a confidential filing's text "
                "private. Each one means reading its source, so start with the ones the argument rests on)")
     for q in o["quotations"]:
@@ -582,15 +644,35 @@ def render_opposing(report, facts_path=None):
         out.append("   Unrecognized (outside the script's forms): "
                    + ", ".join(f"{n} under {t}" for t, n in o["unrecognized"].items()))
     probs = (facts or {}).get("problems") or []
-    if probs or report["notes"]:
+    notes = [n for n in report["notes"] if n not in counted]
+    if probs or notes:
         out.append("")
     for p in probs:
         out.append(f"Facts file: {p}")
-    for note in report["notes"]:
+    for note in notes:
         out.append(f"Note: {note}")
     out.append("")
-    out.append("Not checked: whether each case says what it's cited for, or is still good law. Use a case-law tool.")
+    out.append("Not checked: whether each case says what it's cited for, or is still good law. Use a case-law tool."
+               + (" Nor whether the record says what it's cited for; check the record cites against the record."
+                  if any(u["kind"] == "record" for u in report.get("unread", [])) else ""))
     return "\n".join(out)
+
+
+DOCUMENTS_SHOWN = 8
+
+
+def _court_documents(docs, indent):
+    """Filings from other cases, listed apart from the cases: confirmed by docket, not looked up as cases."""
+    if not docs:
+        return []
+    n = len(docs)
+    out = [f"{indent}Filings from other cases ({n}): not looked up with the cases; confirm "
+           f"{'each' if n != 1 else 'it'} by docket if needed:"]
+    for d in docs[:DOCUMENTS_SHOWN]:
+        out.append(f"{indent}{fl_check._where(d['location']):<20} {_clip(d['text'], 110)}")
+    if n > DOCUMENTS_SHOWN:
+        out.append(f"{indent}and {n - DOCUMENTS_SHOWN} more (--json lists them all)")
+    return out
 
 
 def _facts_counts(n):

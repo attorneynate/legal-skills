@@ -179,6 +179,20 @@
      "message": "Florida's form puts the article and section first: article IV, section 8 of the Florida Constitution in a sentence; Art. IV, § 8, Fla. Const., standing alone.",
      "examples": {"match": ["falls under the Florida Constitution Article IV, § 8.", "under Florida Constitution, Art. I, Section 9(a)"], "no_match": ["article IV, section 8 of the Florida Constitution", "Art. IV, § 8, Fla. Const.", "Florida Constitution Art. IV, § 8, Fla. Const......12"]}},
 
+    {"id": "e-arabic-article", "authority": "9.800(e)(1), (o)(1)", "severity": "error", "kind": "logic", "logic": "arabic_article",
+     "message": "Constitutional articles take roman numerals, section first: Art. I, § 16(b), Fla. Const.",
+     "examples": {"match": ["The right is guaranteed. Art. 1, § 16(b), Fla. Const.", "The right is guaranteed. Art. 1 § 21, Fla. Const.", "The Court must follow it. Fla. Const. art. 1, §17.", "See U.S. Const. art. 6."], "no_match": ["The right is guaranteed. Art. I, § 16(b), Fla. Const.", "The Court must follow it. Fla. Const. art. I, § 17."]}},
+
+    {"id": "e-no-comma", "authority": "9.800(e)(1), (o)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\b(Art\\. [IVXL]+) (§§? ?\\d[\\w()]*(?:, \\d[\\w()]*)*\\.?,? (?:Fla\\.|U\\.S\\.) Const\\.)", "fix": "\\1, \\2",
+     "message": "A comma separates the article from the section: Art. I, § 21, Fla. Const.",
+     "examples": {"match": ["The right is guaranteed. Art. I § 21, Fla. Const.", "The rights are guaranteed. Art. I §§ 9, 21, Fla. Const."], "no_match": ["The right is guaranteed. Art. I, § 21, Fla. Const.", "Art. 1 § 21, Fla. Const."]}},
+
+    {"id": "e-sections-sign", "authority": "Indigo Book R5.2.3", "tier": "bluebook", "severity": "error", "kind": "pattern",
+     "pattern": "(?<!§)§ ?(\\d+[\\w()]*(?:, \\d+[\\w()]*)+)\\.?(,? (?:Fla\\.|U\\.S\\.) Const\\.)|(?<!§)§ ?(\\d{1,4}[A-Z]?\\.\\d+[\\w()]*(?:(?:,| and| &) \\d{1,4}[A-Z]?\\.\\d+[\\w()]*)+)\\.?(,? Fla\\. Stat\\.)|(?<!§)§ ?(\\d+(?:\\([\\w.]+\\))*(?:, \\d+(?:\\([\\w.]+\\))*)+)\\.?(, Laws of Fla\\.)", "fix": "§§ \\1\\3\\5\\2\\4\\6",
+     "message": "Several sections take §§ (Rule 9.800 shows only single sections, so 9.800(p) sends this to the Bluebook system): Art. I, §§ 9, 21, Fla. Const.; §§ 48.031, 48.041, Fla. Stat; Ch. 74-177, §§ 3, 5, Laws of Fla.",
+     "examples": {"match": ["The rights are guaranteed. Art. I, § 9, 17, 21., Fla. Const.", "Art. I, § 9, 21, Fla. Const.", "See § 48.031, 48.041(2), Fla. Stat.", "See § 48.031 and 48.041, Fla. Stat. (2014).", "The chief has power. Ch. 74-177, § 3(15), 50, Laws of Fla."], "no_match": ["Art. I, §§ 9, 21, Fla. Const.", "Art. V, § 3(b)(3), Fla. Const.", "Art. I, § 16(b), (c), Fla. Const.", "See §§ 48.031, 48.041(2), Fla. Stat.", "See § 48.031(6), (7), Fla. Stat.", "See § 48.031(1)-(2), Fla. Stat.", "Ch. 74-177, § 3(15), Laws of Fla.", "Ch. 74-177, §§ 3(15), 50, Laws of Fla."]}},
+
     {"id": "section-sign-space", "summarize": true, "authority": "9.800(e), (f) (examples); Indigo Book", "severity": "check", "kind": "pattern",
      "pattern": "(§§?)(?=\\d)", "fix": "\\1 ",
      "message": "A space follows the section sign (§ 48.031). Rule 9.800(j)(17)'s own example omits it, so this is a check.",
@@ -189,14 +203,14 @@
      "examples": {"match": [], "no_match": []}},
 
     {"id": "f-bluebook-order-year", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\bFla\\. Stat\\. (?:§ ?)?(\\d+\\.\\d+[\\w()]*) \\(((?:Supp\\. )?\\d{4})\\)", "fix": "§ \\1, Fla. Stat. (\\2)",
+     "pattern": "\\bFla\\.? Stat\\.(?: (?:§(§?) ?)?|§(§?) ?)(\\d+\\.\\d+(?:\\([\\w]+\\)| \\((?:\\d{1,3}[a-z]?|[a-zA-Z]{1,2}|[ivx]{1,5})\\))*(?:[-–]\\([\\w]+\\))?(?:(?:,| and) \\d+\\.\\d+(?:\\([\\w]+\\)| \\((?:\\d{1,3}[a-z]?|[a-zA-Z]{1,2}|[ivx]{1,5})\\))*(?:[-–]\\([\\w]+\\))?)*) \\(((?:Supp\\. )?\\d{4})\\)", "fix": "§\\1\\2 \\3, Fla. Stat. (\\4)",
      "message": "Florida's form puts the section first: § 48.031, Fla. Stat. (2014).",
-     "examples": {"match": ["Fla. Stat. § 48.031 (2014).", "Fla. Stat. 48.031 (2014)."], "no_match": ["§ 48.031, Fla. Stat. (2014).", "7 Fla. Stat. Ann. § 95.11 (2017)."]}},
+     "examples": {"match": ["Fla. Stat. § 48.031 (2014).", "Fla. Stat. 48.031 (2014).", "Fla. Stat. § 48.031 (1) (a) (2014).", "Fla. Stat.§ 48.031(1) (2014)."], "no_match": ["§ 48.031, Fla. Stat. (2014).", "7 Fla. Stat. Ann. § 95.11 (2017)."]}},
 
     {"id": "f-bluebook-order", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\bFla\\. Stat\\. (?:§ ?)?(\\d+\\.\\d+(?:\\([\\w]+\\))*)(?![\\w]|\\.\\w| \\(|\\([\\w]+\\))", "fix": "§ \\1, Fla. Stat.",
+     "pattern": "\\bFla\\.? Stat\\.(?: (?:§(§?) ?)?|§(§?) ?)(\\d+\\.\\d+(?:\\([\\w]+\\)| \\((?:\\d{1,3}[a-z]?|[a-zA-Z]{1,2}|[ivx]{1,5})\\))*(?:[-–]\\([\\w]+\\))?(?:(?:,| and) \\d+\\.\\d+(?:\\([\\w]+\\)| \\((?:\\d{1,3}[a-z]?|[a-zA-Z]{1,2}|[ivx]{1,5})\\))*(?:[-–]\\([\\w]+\\))?)*)(?![\\w]|\\.\\w| \\(|\\([\\w]+\\)|[-–])", "fix": "§\\1\\2 \\3, Fla. Stat.",
      "message": "Florida's form puts the section first: § 48.031, Fla. Stat. (year).",
-     "examples": {"match": ["set forth in Fla. Stat. § 70.51(23), and", "giving Plaintiff standing under Fla. Stat. 64.031. Problematically,", "See Fla. Stat. 689.15; Aderhold v. Aderhold", "Fla. Stat. § 48.031(1)(emphasis added)."], "no_match": ["§ 70.51(23), Fla. Stat.", "Fla. Stat. § 48.031 (2014)", "Fla. Stat. (2014)", "Fla. Stat. § 689.15(2)(a) (2020)"]}},
+     "examples": {"match": ["set forth in Fla. Stat. § 70.51(23), and", "under Fla. Stat. § 70.51 (23) (a), and", "giving Plaintiff standing under Fla. Stat. 64.031. Problematically,", "See Fla. Stat. 689.15; Aderhold v. Aderhold", "Fla. Stat. § 48.031(1)(emphasis added).", "The owner is liable. Fla. Stat.§ 48.031(1)(a)-(b).", "See Fla. Stat. §§ 48.031, 48.041.", "construing the language of Fla Stat. 48.031 went on"], "no_match": ["§ 70.51(23), Fla. Stat.", "Fla. Stat. § 48.031 (2014)", "Fla. Stat. (2014)", "Fla. Stat. § 689.15(2)(a) (2020)"]}},
 
     {"id": "f-fs", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
      "pattern": "\\bF\\. ?S\\.(?![\\w.])(?! ?A\\.)", "fix": null,
@@ -208,10 +222,19 @@
      "message": "A comma separates the section from Fla. Stat.",
      "examples": {"match": ["§ 48.031 Fla. Stat. (2014).", "§ 70.51 Fla. Stat., or"], "no_match": ["§ 48.031, Fla. Stat. (2014)."]}},
 
+    {"id": "f-subsection-space", "authority": "9.800(f)(1)", "severity": "error", "kind": "logic", "logic": "subsection_space",
+     "message": "A section's subsections are written closed up: § 48.031(5)(b), Fla. Stat.",
+     "examples": {"match": ["The court found a prior felony, § 48.031 (5) (b), Fla. Stat. (1995).", "The court found it, § 48.031(5) (d), Fla. Stat."], "no_match": ["The court found it, § 48.031(5)(b), Fla. Stat. (1995).", "The court found it. Fla. Stat. § 48.031 (2019)."]}},
+
     {"id": "f-stat-period", "summarize": true, "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
      "pattern": "\\bFla\\. Stat(?![.\\w])", "fix": "Fla. Stat.",
      "message": "Fla. Stat. ends with a period.",
      "examples": {"match": ["§ 316.193, Fla. Stat (2023)"], "no_match": ["§ 316.193, Fla. Stat. (2023)", "Fla. Stats."]}},
+
+    {"id": "f-fla-period", "summarize": true, "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
+     "pattern": "\\bFla Stat(?:\\.|(?![\\w.]))", "fix": "Fla. Stat.",
+     "message": "Fla. Stat. takes a period after each word.",
+     "examples": {"match": ["see also § 48.031, Fla Stat. (granting power)", "§ 48.031, Fla Stat (2023)"], "no_match": ["§ 48.031, Fla. Stat. (2023)", "Fla Statutes"]}},
 
     {"id": "f-year-missing", "authority": "9.800(f)(1)", "severity": "check", "kind": "logic", "logic": "statute_year_summary",
      "message": "Statute cites without the year of the edition. Courts often omit it for current law; add it where the version matters, such as a statute amended since the events. Reported once per document.",
@@ -250,9 +273,9 @@
      "examples": {"match": [], "no_match": []}},
 
     {"id": "i-bluebook-order-section", "authority": "9.800(i)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\bLaws of Fla\\. ch\\. (\\d+-\\d+), (§ \\d+)", "fix": "Ch. \\1, \\2, Laws of Fla.",
+     "pattern": "\\bLaws of Fla\\. ch\\. (\\d+-\\d+), (§§? ?\\d+(?:\\([\\w.]+\\))*(?:, \\d+(?:\\([\\w.]+\\))*)*)", "fix": "Ch. \\1, \\2, Laws of Fla.",
      "message": "Florida's form is Ch. 74-177, § 5, Laws of Fla.",
-     "examples": {"match": ["Laws of Fla. ch. 74-177, § 5."], "no_match": ["Ch. 74-177, § 5, Laws of Fla."]}},
+     "examples": {"match": ["Laws of Fla. ch. 74-177, § 5.", "Laws of Fla. ch. 74-177, §§ 5(2), 7."], "no_match": ["Ch. 74-177, § 5, Laws of Fla.", "Ch. 74-177, §§ 5(2), 7, Laws of Fla."]}},
 
     {"id": "i-bluebook-order", "authority": "9.800(i)(1)", "severity": "error", "kind": "pattern",
      "pattern": "\\bLaws of Fla\\. ch\\. (\\d+-\\d+)(?!\\d|, §)", "fix": "Ch. \\1, Laws of Fla.",
@@ -324,6 +347,14 @@
     {"id": "record-cite-form", "authority": "Indigo Book R26, R5.3", "severity": "check", "kind": "logic", "logic": "record_cite_form",
      "message": "Record citations: several paragraphs take ¶¶ (as several sections take §§, Indigo Book R5.2.3; Bluebook R3.3(b)); Id. isn't used for record citations (R26); and where it is, a paragraph pinpoint takes ¶ with no \"at\" (R5.3). A court's own rules on citing the record govern over these. Reported once per document.",
      "examples": {"match": ["The parties disagree. Smith Aff. ¶ 8, 12. They still do.", "The freeze bounced checks. Smith Aff. ¶ 78. It hurt the business. Id. at 79."], "no_match": ["The parties disagree. Smith Aff. ¶¶ 8, 12. They still do.", "See Smith v. Jones, 700 So. 2d 100, 102 (Fla. 1997). Id. at 103."]}},
+
+    {"id": "document-pin-order", "authority": "Indigo Book R25", "severity": "error", "kind": "logic", "logic": "document_pin_order", "tier": "bluebook",
+     "message": "A document from another case takes its pinpoint after its title, before the case's citation: Answer Br. at 12, Able v. State, No. SC2020-0001 (Fla. Mar. 1, 2021).",
+     "examples": {"match": ["The State conceded it. Answer Br., Able v. State, No. SC2020-0001 (Fla. Mar. 1, 2021), at 12.", "It was pleaded. Compl., Fox v. Dunn, No. 4:20-cv-12-AB (N.D. Fla. Mar. 1, 2021), ¶ 7."], "no_match": ["The State conceded it. Answer Br. at 12, Able v. State, No. SC2020-0001 (Fla. Mar. 1, 2021).", "The State conceded it. Answer Br., Able v. State, No. SC2020-0001 (Fla. Mar. 1, 2021).", "The court ruled. Able v. State, No. SC2020-0001 (Fla. Mar. 1, 2021)."]}},
+
+    {"id": "id-court-document", "authority": "Indigo Book R26", "severity": "check", "kind": "logic", "logic": "id_court_document", "tier": "bluebook",
+     "message": "Id. isn't used for a document from another case (Indigo Book R26); use the document's short form, such as the short name given in its full citation with the pinpoint (Able Br. at 14). Reported once per document.",
+     "examples": {"match": ["The State conceded it. Answer Br. at 12, Able v. State, No. SC2020-0001 (Fla. Mar. 1, 2021) [hereinafter Able Br.]. It said so again. Id. at 14."], "no_match": ["The State conceded it. Answer Br. at 12, Able v. State, No. SC2020-0001 (Fla. Mar. 1, 2021) [hereinafter Able Br.]. It said so again. Able Br. at 14.", "The court agreed. Doe v. Roe, 700 So. 2d 100, 102 (Fla. 1st DCA 1997). Id. at 103."]}},
 
     {"id": "ellipsis-form", "summarize": true, "authority": "Indigo Book R8.3.1", "severity": "error", "kind": "logic", "logic": "ellipsis_form",
      "message": "An ellipsis is three periods with a space before, between, and after each: . . . (four at the end of a sentence: . . . .).",
@@ -411,6 +442,16 @@
      "examples": {"match": ["Fenelon v. State, 594 So. 2d 292, 288 (Fla. 1992).",
                             "Fenelon v. State, 594 So. 2d 292, 293 (Fla. 1992). Sansone v. United States, 380 U.S. 343 (1965). Fenelon, 594 So. 2d at 288."],
                   "no_match": ["Fenelon v. State, 594 So. 2d 292, 292 (Fla. 1992). Fenelon, 594 So. 2d at 294. Id. at 295."]}},
+
+    {"id": "section-short-before-full", "authority": "Indigo Book R6.1, R6.2.1", "severity": "check", "kind": "logic", "logic": "section_short_before_full", "tier": "bluebook",
+     "message": "A section cited without its code comes before the code is cited in full; give the full citation first (§ 48.031(2), Fla. Stat.).",
+     "examples": {"match": ["The officer must serve it. See § 48.031(2). Service is personal. § 48.031(1), Fla. Stat."],
+                  "no_match": ["Service is personal. § 48.031(1), Fla. Stat. The officer must serve it. See § 48.031(2)."]}},
+
+    {"id": "constitution-short", "authority": "Indigo Book R23.3", "severity": "check", "kind": "logic", "logic": "constitution_short", "tier": "bluebook",
+     "message": "A constitution has no short form: cite it in full each time (Id. may repeat the provision just cited).",
+     "examples": {"match": ["The court has power. Art. V, § 3, Fla. Const. The county courts are limited. Art. V, § 6(b)."],
+                  "no_match": ["The court has power. Art. V, § 3, Fla. Const. The county courts are limited. Art. V, § 6(b), Fla. Const."]}},
 
     {"id": "short-before-full", "authority": "Indigo Book R15.2.1", "severity": "error", "kind": "logic", "logic": "short_before_full", "tier": "bluebook",
      "message": "A short form comes before the case's first full citation; give the full citation first.",

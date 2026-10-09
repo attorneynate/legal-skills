@@ -783,7 +783,7 @@ class Doc:
         self.quotes, self.unclosed_quotes = paired_quotes(self)
         self.defined_terms = [q for q in self.quotes if defined_term(self.norm, *q)]
         self.quotes = [q for q in self.quotes if q not in self.defined_terms]
-        self.periods = self.brackets = self.clauses = self.sentences = None
+        self.periods = self.brackets = self.clauses = self.sentences = self.unread = None
 
     def read_sentences(self, abbreviations):
         """Build the sentence reader's layers (fl_sentence.py) over norm, with the quotations opaque."""
@@ -791,6 +791,12 @@ class Doc:
         self.brackets = fs.Brackets(self.norm, self.periods, self.quotes)
         self.clauses = fs.Clauses(self.norm, self.periods, self.brackets)
         self.sentences = fs.Sentences(self.norm, self.periods, self.brackets)
+
+    def read_unread(self, cites):
+        """Lay the citations over the sentences, then find what looks like an authority where none was
+        recognized (fl_sentence.Unread)."""
+        self.sentences.overlay([(c["start"], c["end"]) for c in cites])
+        self.unread = fs.Unread(self.norm, self.sentences, self.block_quotes)
 
     def _block_quotes(self):
         """Norm spans of block quotations, which carry no quotation marks. The source's layout decides
@@ -1477,29 +1483,48 @@ HISTORY = re.compile(
 # A Florida Statutes section and its pinpoint: 48.031, 775.082(3)(a)1., 921.141(2)(b)2.a.-b., 624.307(1)-(2);
 # then more of them: "(6), (7)", "782.07(1) and (3)", "688.001-009", "§§ 626.785(1), 626.7845(1)".
 SUBS = r"(?:\([\w.]+\))+"
-SEC = r"\d{1,4}[A-Z]?\.\d+[A-Za-z]?(?:" + SUBS + r"(?:\d+\.?(?:[a-z]\.)?(?:[-–][a-z]\.)?)?)?(?:[-–]" + SUBS + r")?"
+# A section's own subsections may be spaced, "48.031 (5) (b)" (f-subsection-space closes them up), when each
+# looks like a subsection: not a year, "(2019)", or a word, "(repealed)".
+SUBS_SPACED = r"(?:\([\w.]+\)| \((?:\d{1,3}[a-z]?|[a-zA-Z]{1,2}|[ivx]{1,5})\))+"
+SEC = r"\d{1,4}[A-Z]?\.\d+[A-Za-z]?(?:" + SUBS_SPACED + r"(?:\d+\.?(?:[a-z]\.)?(?:[-–][a-z]\.)?)?)?(?:[-–]" + SUBS + r")?"
 SECS = (SEC + r"(?:(?:,? (?:and|or|&|through) |, |[-–] ?)(?:" + SEC + r"|" + SUBS + r"(?:[-–]" + SUBS + r")?|\.\d+[\w]*(?:"
         + SUBS + r")?)|[-–]\d{2,4}(?![\d.]))*")
 CHAPTER = r"\d{1,3}[A-Z]?(?:, [Pp]art [IVX]+)?"
 YEAR_PAREN = r"(?: \((?P<year>(?:Supp\. |West )*(?:1[89]|20)\d\d)\))?"
-STAT_CODE = r"(?:Fla\. Stats?\.?(?![\w.]| Ann\.)|Florida Statutes)"
+# Not before a word or another period, unless the period begins a table of authorities' leader dots
+# ("Fla. Stat........ 9"), or the word is a footnote number glued to the period ("Fla. Stat.7 The ..."),
+# which is left out of the citation. "Fla Stat." without its first period is read too (f-fla-period).
+STAT_CODE = (r"(?:Fla\.? Stats?\.?(?!(?!(?<=\.)\d{1,3}(?:\s+[\"“]?(?-i:[A-Z])|\s*$))\w|\.(?!\.{3})| Ann\.)"
+             r"|Florida Statutes)")
 STATUTES = [
     # (form, regex); the 'year' group, when present, gives the edition
     ("abbreviated", re.compile(r"(?P<sign>§§?) ?(?P<sec>" + SECS + r"),? (?P<code>" + STAT_CODE + r")" + YEAR_PAREN, re.I)),
     ("abbreviated", re.compile(r"\b[Cc]h(?:apters?|s?\.) (?P<sec>" + CHAPTER + r"),? (?P<code>Fla\. Stat\.?(?![\w.]| Ann\.))" + YEAR_PAREN, re.I)),
     ("sentence", re.compile(r"\b(?:[Ss]ections?|[Cc]hapters?) (?P<sec>" + SECS + r"|" + CHAPTER + r"),? (?:of (?:the )?)?"
                             r"(?P<code>Florida Statutes|Fla\. Stat\.)" + YEAR_PAREN)),
-    ("bluebook-order", re.compile(r"\b(?P<code>Fla\. Stat\.) (?:§§? ?)?(?P<sec>" + SECS + r")" + YEAR_PAREN)),
+    # "Fla. Stat. § 48.031", "Fla. Stat. 48.031", and "Fla. Stat.§ 48.031" with no space before the sign
+    ("bluebook-order", re.compile(r"\b(?P<code>Fla\.? Stat\.)(?: (?:§§? ?)?|§§? ?)(?P<sec>" + SECS + r")" + YEAR_PAREN)),
     ("fs", re.compile(r"(?:(?:§§?|[Ss]ections?) ?(?P<sec>" + SECS + r"),? (?P<code>F\. ?S\.)(?![\w.])(?! ?A\.)|(?P<code2>F\. ?S\.) §? ?(?P<sec2>" + SEC + r"))" + YEAR_PAREN)),
 ]
 # "§ 48.031, Fla. Stat. Ann.": the official form's order with the annotated code's name (9.800(f) or (g)).
 ANNOTATED_ORDER = re.compile(r"(?P<sign>§§?) ?(?P<sec>" + SECS + r"),? Fla\. Stat\. Ann\.(?: \((?P<year>(?:West )?(?:1[89]|20)\d\d)\))?")
 ANNOTATED = re.compile(r"(?:\b(?P<vol>\d{1,2}[A-Z]?) )?Fla\. Stat\. Ann\. (?:§§? ?(?P<sec>" + SECS + r")|(?P<pages>\d+[-–]\d+))(?: \((?P<year>[^()]{0,20}\d{4})\))?", re.I)
 
+# An article's number: roman, as the rule writes it, or arabic ("Art. 1, § 16(b)"), which e-arabic-article fixes.
+ARTICLE_NUM = r"(?P<num>[IVXL]+|\d{1,2}(?!\d|\.\d))"
+# A section and its subsections, a range, or a list of sections ("§ 9, 17, 21", which e-sections-sign fixes).
+CONST_SEC = r"(?P<sec>\d+[\w()]*(?:[-–]\d+[\w()]*)?(?:, " + SUBS + r")*(?:, \d+[\w()]*)*)"
 CONSTITUTIONS = [
-    ("abbreviated", re.compile(r"\b(?P<what>[Aa]rt(?:\.|icle)) (?P<num>[IVXL]+)(?:, (?:§§?|[Ss]ec(?:tions?|s?\.)) ?(?P<sec>\d+[\w()]*(?:[-–]\d+[\w()]*)?(?:, " + SUBS + r")*))?(?:, cl\. (?P<cl>\d+))?,? (?P<which>Fla\. Const\.|U\.S\. Const\.)(?: \((?P<year>\d{4})\))?", re.I)),
+    # "Art. I § 21, Fla. Const." without the comma is read too (e-no-comma), and a stray period after the
+    # section ("§ 9, 17, 21., Fla. Const.").
+    ("abbreviated", re.compile(r"\b(?P<what>[Aa]rt(?:\.|icle)) " + ARTICLE_NUM + r"(?:,? (?P<sign>§§?|[Ss]ec(?:tions?|s?\.)) ?" + CONST_SEC + r"(?:\.(?=,))?)?(?:, cl\. (?P<cl>\d+))?,? (?P<which>Fla\. Const\.|U\.S\. Const\.)(?: \((?P<year>\d{4})\))?", re.I)),
+    # The abbreviation in the sentence form: "Art. I, § 17 of the Florida Constitution", "Article I, § 17 of
+    # ...". In a sentence, spelled-out-in-sentence gives "article I, section 17 of the Florida Constitution".
+    ("hybrid", re.compile(r"\b(?P<what>[Aa]rt\.) " + ARTICLE_NUM + r"(?:,? (?P<sign>§§?|[Ss]ec(?:tions?|s?\.)) ?" + CONST_SEC + r")?,? of the (?P<which>Florida|United States|U\.S\.) Constitution")),
+    ("hybrid", re.compile(r"\b(?P<what>[Aa]rticle) " + ARTICLE_NUM + r",? (?P<sign>§§?) ?" + CONST_SEC + r",? of the (?P<which>Florida|United States|U\.S\.) Constitution")),
     ("abbreviated", re.compile(r"\b(?P<what>[Aa]mend(?:\.|ment)) (?P<num>[IVXL]+)(?:, (?:§|[Ss]ec\.) ?(?P<sec>\d+))?, (?P<which>U\.S\. Const\.)", re.I)),
-    ("bluebook-order", re.compile(r"\b(?P<which>Fla\.|U\.S\.) Const\. (?P<what>art\.|amend\.) (?P<num>[IVXL]+)(?:, § ?(?P<sec>\d+[\w()]*))?(?:, cl\. (?P<cl>\d+))?", re.I)),
+    ("bluebook-order", re.compile(r"\b(?P<which>Fla\.|U\.S\.) Const\. (?P<what>art\.|amend\.) (?P<num>[IVXL]+|(?<=art\. )\d{1,2}(?!\d|\.\d))"
+                                  r"(?:, (?P<sign>§§?) ?(?P<sec>\d+[\w()]*))?(?:, cl\. (?P<cl>\d+))?", re.I)),
     ("sentence", re.compile(r"\b[Aa]rticle (?P<num>[IVXL]+)(?:, [Ss]ections? (?P<sec>\d+[\w()]*))?,? of the (?P<which>Florida|United States|U\.S\.) Constitution")),
 ]
 ADMIN_CODE = [
@@ -1507,11 +1532,26 @@ ADMIN_CODE = [
     ("fac", re.compile(r"\b(?:[Rr]ules? )?(?P<rule>\d+[A-Z]{0,3}-\d+\.\d+[\w()]*), F\. ?A\. ?C\.(?!\w)(?: \((?P<year>\d{4})\))?")),
     ("sentence", re.compile(r"\b(?:Florida Administrative Code [Rr]ule (?P<rule>\d+[A-Z]{0,3}-\d+\.\d+[\w()]*)|[Rr]ule (?P<rule2>\d+[A-Z]{0,3}-\d+\.\d+[\w()]*),? (?:of the )?Florida Administrative Code)(?: \((?P<year>\d{4})\))?")),
 ]
+# A session law's section, its subsections, or several of them: "§ 5", "§§ 34(15), 50".
+LAW_SEC = r"(?:, §§? ?(?P<sec>\d+(?:\([\w.]+\))*(?:, \d+(?:\([\w.]+\))*)*))?"
 SESSION_LAWS = [
-    ("abbreviated", re.compile(r"\b[Cc]h(?:\.|apter) (?P<ch>\d{2,4}-\d+|\d{3,5})(?:, § ?(?P<sec>\d+))?, Laws of Fla\.(?: \((?P<year>\d{4})\))?")),
-    ("bluebook-order", re.compile(r"\bLaws of Fla\. ch\. (?P<ch>\d+-\d+)(?:, § ?(?P<sec>\d+))?")),
+    ("abbreviated", re.compile(r"\b[Cc]h(?:\.|apter) (?P<ch>\d{2,4}-\d+|\d{3,5})" + LAW_SEC + r", Laws of Fla\.(?: \((?P<year>\d{4})\))?")),
+    ("bluebook-order", re.compile(r"\bLaws of Fla\. ch\. (?P<ch>\d+-\d+)" + LAW_SEC)),
     ("sentence", re.compile(r"\b[Cc]hapter (?P<ch>\d{2,4}-\d+|\d{3,5})(?:, section \d+)?,? Laws of Florida(?: \((?P<year>\d{4})\))?")),
 ]
+# A section with no code named (Engine._section_shorts): a statute's, which has a decimal ("§ 48.031(2)",
+# not "§ 1983"), or a constitution's article and section. It must end its clause, after any parentheticals:
+# not run on in the writer's words, and not before a table of authorities' leader dots.
+STATUTE_SHORT = re.compile(r"(?<![§\w])(?P<sign>§§?) ?(?P<sec>" + SECS + r")")
+CONSTITUTION_SHORT = re.compile(r"\b(?:Art\.|Article) (?P<num>[IVXL]+),? (?P<sign>§§?) ?" + CONST_SEC)
+SHORT_TAIL = re.compile(r"(?: ?\((?:[^()]|\([^()]*\))*\))*\s*(?:;|\.(?!\s*[.…])|$)")
+# Another code's section sign, or another state's constitution, which a later bare section may follow:
+# "VA. CODE § 2.2-3902", "O.C.G.A. § 9-11-12", "Ga. Code Ann. §", "N.Y. Gen. Bus. Law §", "Ga. Const. art. I".
+# The word before the sign must look like a code's name: not "the State's § 1.01" or a treatise's "Statutory
+# Construction § 55:4". Recognized citations are set aside.
+OTHER_CODE_SIGN = re.compile(r"(?<![\w.'])(?:[A-Z]{2,}\.?|(?:[A-Z]\.){2,}|Code|Ann\.|Stats?\.|Laws?|Gen\.|Rev\.|Comp\.)"
+                             r" ?(?P<sign>§)")
+OTHER_CONST = re.compile(r"(?<![\w.])(?!Fla\.|U\.S\.)(?:[A-Z][a-z]{1,4}\.|[A-Z]\.[A-Z]\.) Const\.")
 AG_OPINIONS = [
     re.compile(r"\b(?:Fla\. )?Ops?\. Att'y Gen\.(?: Fla\.)? (?P<num>\d{2,4}-\d{1,4})(?: \((?P<year>\d{4})\))?"),
     re.compile(r"\b(?:Fla\. )?AGO (?P<num>\d{2,4}-\d{1,4})(?: \((?P<year>\d{4})\))?"),
@@ -1579,29 +1619,44 @@ ID_RX = re.compile(r"(?<![\w.'])(?:(?P<id>[Ii]d\.|[Ii]bid\.?|[Ii]d(?=,? at \*?\d
 SUPRA_RX = re.compile(r"\(?\bsupra\b\)?(?: note \d+)?(?P<pin>,? at (?P<page>" + PAGE_PIN + r"))?")
 SUPRA_NAME = re.compile(r"((?:[A-Z][\w'&\-]*\.?|v\.|of|the|de|for|&|ex rel\.)(?: (?:[A-Z][\w'&\-]*\.?,?|v\.|of|the|de|for|&|ex rel\.)){0,10}),? $")
 SHORT_NAME = re.compile(r"((?:(?:[A-Z]\.){2,}|[A-Z][\w'&\-]*\.?|of|the|de|&|ex rel\.)(?: (?:[A-Z][\w'&\-]*\.?|of|the|de|&|ex rel\.)){0,5}), $")
-# Record and appendix cites ("Trial R.19", "(R. 45)", "(V3 T. 120)", "App. 12", "I.B. at 5"), which an
-# Id. may follow (wrongly, Indigo Book R26), though the script doesn't extract them.
-RECORD_RX = re.compile(r"(?<![\w.])(?:(?:Trial|Supp\.|Vol\.|V\d+|[IVX]+|PC|Post-?conviction)\s?)?"
-                       r"(?:R|T|TR|Tr|SR|PCR|PC-R|ROA|App|Appx|A|Ex|SA|I\.?B|A\.?B|R\.?B|Doc|ECF(?: No)?)\.? ?"
-                       r"(?:at |p\. ?|pp\. ?|\d+:)?\d+")
-# Depositions, transcripts, affidavits, and exhibits in a trial-court filing ("Dep. A. Smith, at 12:4-6",
-# "Smith Dep. 12:4", "Hr'g Tr. 5", "Aff. ¶ 3", 'Exhibit "C"'), and any page:line pinpoint. An Id. after one
-# of these refers to it, not to the case or statute before it.
-TRANSCRIPT_RX = re.compile(r"(?<![\w.])(?:Dep(?:o)?\.|Deposition|Tr\.|Transcript|Aff\.|Affidavit|Decl\.|Declaration)(?=[\s,])"
-                           r"|\b(?:Exhibit|Ex\.) [\"“]?[A-Z0-9]{1,3}\b"
-                           r"|(?<![\d:])\d{1,4}: ?\d{1,2}(?:-\d{1,4}(?::\d{1,2})?)?(?![\d:])")
+# Record, appendix, transcript, and exhibit cites, which the script doesn't extract: the sentence reader's
+# (fl_sentence.py), which counts them among the authorities it didn't read.
+RECORD_RX, TRANSCRIPT_RX = fs.RECORD_RX, fs.TRANSCRIPT_RX
 # An Id. pinpointed to a page and line ("Id. at 14:2") cites a transcript.
 ID_TRANSCRIPT_PIN = re.compile(r"[Ii]d\.?,? at \d{1,4}: ?\d{1,2}\b")
-# A year parenthetical the script didn't take as a citation ("... Federal Courts and the Law 24 (Amy
-# Gutmann ed., 1997)") is probably a book or article an Id. may refer to.
-UNSEEN_CITE = re.compile(r"\((?:[^()]*[ ,])?(?:1[6-9]|20)\d\d\)"
-                         r"|\b[A-Z][A-Za-z.]*\.(?: ?\d?[a-z]{0,2})? at \*?\d")   # or a stray "U.S. at 825"
 STRING_GAP = re.compile(r"\s*[.,]?\s*;\s*(?:(?:see|also|cf\.|but|accord|e\.g\.,?|compare|contra|and|with)\s*,?\s*)*$", re.I)
 SECTION_KINDS = ("statute", "constitution", "admin_code", "session_law", "rule")
 SHORT_KINDS = ("id", "supra")
 GOVERNMENT_PARTY = re.compile(r"^(?:State(?: of [A-Z]\w+)?|United States(?: of America)?|People|Commonwealth|Florida|"
                               r"(?:City|Town|Village|County|School Board|Board|Dep't|Department|Div\.|Agency) of\b|In re\b|Ex parte\b)")
 REPEAT_WINDOW = 10            # a full citation repeated within this many citations, on the same page, takes a short form
+# A document from another case (Indigo Book R25): its title (Table T18's words), the pinpoint, then the case's
+# citation, "Def.'s Mot. to Dismiss at 4, Able v. Baker, No. 1:20-cv-1 (S.D. Fla. Mar. 1, 2021)". A word that
+# names only a document counts anywhere in the title; one that also names parties ("Fraternal Order of
+# Police", "Motion Picture Ass'n", "Dep't of Veterans Aff.") only first, or after a party's possessive, a
+# modifier, or another document word ("Answer Br.", "Def.'s Mot.", "Final Order").
+DOC_WORDS = {"Br.", "Mot.", "Compl.", "Pet.", "Resp.", "Decl.", "Obj.", "Opp'n", "Stip.", "Interrog.", "Hr'g",
+             "Complaint", "Affidavit", "Memorandum", "Transcript", "Deposition", "Warrant", "Indictment"}
+DOC_WORDS_LEAD = {"Brief", "Motion", "Petition", "Response", "Order", "Answer", "Reply", "Notice", "Judgment",
+                  "Declaration", "Objection", "Opposition", "Information", "Mem.", "Aff.", "Tr.", "Dep.", "J."}
+DOC_MODIFIERS = {"Initial", "Amended", "Am.", "First", "Second", "Third", "Supplemental", "Suppl.", "Supp.", "Final",
+                 "Agreed", "Joint", "Emergency", "Verified", "Renewed", "Corrected", "Interim", "Proposed", "Trial",
+                 "Ct.", "Def.", "Defs.", "Pl.", "Pls.", "Summ.", "Partial", "Sworn"}
+DOC_CONNECTORS = {"of", "to", "for", "in", "on", "and", "the", "re", "&", "with", "from", "a", "an", "under"}
+DOC_SIGNALS = {"See", "Accord", "Cf.", "Compare", "Contra", "But", "E.g.,", "E.g.", "Also", "The", "A", "An", "In",
+               "As", "And", "Or"}
+# A table of authorities' heading over the entries, which a title would otherwise run into: "Court Filings".
+DOC_HEADINGS = {"cases", "statutes", "rules", "authorities", "filings", "pleadings", "documents", "materials",
+                "other", "sources", "record", "briefs", "orders", "motions", "provisions", "constitutional"}
+DOC_POSSESSIVE = re.compile(r"[A-Z][\w.'’]*(?:['’]s|s['’])")
+# What can't start a case's name after a comma: the rest of a party's name ("Fraternal Order of Police, Lodge
+# 5 v. ...", "Order Co., Inc. v. ...").
+NAME_GOES_ON = re.compile(r"(?:Inc|Co|Corp|LLC|L\.L\.C|Ltd|L\.P|LP|LLP|P\.A|N\.A|P\.C|PLLC|P\.L\.L\.C|Jr|Sr|Lodge|Local"
+                          r"|Chapter|Post|Branch|Div|et|al|II|III|IV)\b")
+DOC_PIN = (r"(?:at (?P<page>" + PAGE_PIN + r"(?:, " + PAGE_PIN + r")*)"
+           r"|(?:at )?(?P<para>¶¶? ?\d+[a-z]?(?:(?:, ?|[-–])\d+[a-z]?)*))")
+DOC_PIN_BEFORE = re.compile(r" " + DOC_PIN + r"$")
+DOC_PIN_AFTER = re.compile(r",? " + DOC_PIN + r"(?![\w\-–])")
 
 
 # ---------------------------------------------------------------- the engine
@@ -1652,6 +1707,9 @@ class Engine:
             "short_missing_at": lc_short_missing_at, "name_comma": lc_name_comma,
             "supra_case": lc_supra_case, "full_repeated": lc_full_repeated, "signal_capital": lc_signal_capital,
             "record_cite_form": lc_record_cite_form, "ellipsis_form": lc_ellipsis_form,
+            "document_pin_order": lc_document_pin_order, "id_court_document": lc_id_court_document,
+            "arabic_article": lc_arabic_article, "subsection_space": lc_subsection_space,
+            "section_short_before_full": lc_section_short_before_full, "constitution_short": lc_constitution_short,
         }
         missing = [r["logic"] for r in self.records if r["kind"] == "logic" and r["logic"] not in self.logic]
         if missing:
@@ -1698,22 +1756,95 @@ class Engine:
                     name = norm[b:c["cite_start"]].rstrip(", ")
                     if re.match(r"\S.* v\. \S", name) or name.startswith(("In re ", "Ex parte ")):
                         c["case_name"], c["start"], c["name_start"] = name, b, b
+        for c in cites:
+            _court_document(doc, c)
         cites = self._short_without_at(doc, cites, others, quotes)
         cites = _resolve(cites, others)
         cites = _resolve(cites, self._unrecognized(norm))
         cites.sort(key=lambda c: c["start"])
+        cites += self._section_shorts(doc, cites, quotes)
+        cites.sort(key=lambda c: c["start"])
         prev_case = None
         for i, c in enumerate(cites):
             c["index"] = i
+        for i, c in enumerate(cites):
+            if "_full" in c:
+                full = c.pop("_full")
+                c["short_of"] = full["index"] if full is not None else None
             c["text"] = norm[c["start"]:c["end"]]
             c["in_quote"] = any(a < c["start"] < b for a, b in quotes)
             c["location"] = doc.location(c["start"], c["end"])
+            if c["kind"] in ("case", "court_document"):
+                c["cite"] = case_cite(c)          # a court document's: its case's docket number
             if c["kind"] == "case":
-                c["cite"] = case_cite(c)
                 if c.get("history") and prev_case is not None:
                     c["history_of"] = prev_case["index"]
                 prev_case = c
         return cites
+
+    def _section_shorts(self, doc, cites, quotes):
+        """A section cited with no code named, in a citation clause of its own: "See § 48.031(2).", "; §
+        1.01 (defining ...)", "Art. V, § 6(b) (providing ...)." Not in the writer's prose ("under § 1.01(2)
+        the court"), where a section sign may mean anything. Each is read as a short form of the code (or
+        constitution) cited in full most recently before it (Indigo Book R6.2.1), and stays unread, and
+        counted, when that's another code ("42 U.S.C. § 1983", then "§ 1983"). With none before it, it's
+        read if the document cites a Florida one later, and lc_section_short_before_full reports it."""
+        norm, sents = doc.norm, doc.sentences
+        taken = [(c["start"], c["end"]) for c in cites]
+        # Each recognized citation that sets the code for what follows: ("fla", c) or ("other", c).
+        stat_ctx = [(c["start"], "fla", c) for c in cites if c["kind"] == "statute"]
+        stat_ctx += [(c["start"], "other", c) for c in cites if c["kind"] == "unrecognized"
+                     and c["what"].startswith(("federal statute", "federal session law"))]
+        const_ctx = [(c["start"], c["which"], c) for c in cites if c["kind"] == "constitution"]
+        # A section sign or a constitution named by a code the script doesn't read: "VA. CODE § 2.2-3902",
+        # "O.C.G.A. § 9-11-12", "Ga. Const. art. I".
+        for m in OTHER_CODE_SIGN.finditer(norm):
+            if not _overlaps({"start": m.start("sign"), "end": m.end("sign")}, taken):
+                stat_ctx.append((m.start("sign"), "other", None))
+        for m in OTHER_CONST.finditer(norm):
+            if not _overlaps({"start": m.start(), "end": m.end()}, taken):
+                const_ctx.append((m.start(), "other", None))
+        stat_ctx.sort(key=lambda t: t[0])
+        const_ctx.sort(key=lambda t: t[0])
+        out = []
+        for kind, rx, ctx in (("statute", STATUTE_SHORT, stat_ctx), ("constitution", CONSTITUTION_SHORT, const_ctx)):
+            for m in rx.finditer(norm):
+                a, b = m.start(), m.end()
+                if _overlaps({"start": a, "end": b}, taken) or any(x < a < y for x, y in quotes):
+                    continue
+                lead = re.sub(r"^\d{1,3}\s+", "", norm[sents.clause_start(a):a])   # a footnote's number
+                if lead and not fs.SIGNAL_CLAUSE.fullmatch(lead):
+                    continue                   # the writer's prose: "under § 1.01(2) the court"
+                if not (m.group(0).endswith(".") or SHORT_TAIL.match(norm, b)):
+                    continue                   # the clause goes on: "§ 1.01(2), which provides"
+                before = [t for t in ctx if t[0] < a]
+                if before:
+                    which, full = before[-1][1], before[-1][2]
+                    if which == "other":
+                        continue               # another code's short form; counted, not read
+                    later = bool(full and full.get("form") == "short" and full["before_full"])
+                else:
+                    after = [t for t in ctx if t[0] > b and t[1] != "other"]
+                    if not after:
+                        continue               # no code cited anywhere: counted, not read
+                    which, full, later = after[0][1], after[0][2], True
+                if full is not None and full.get("short_of_full") is not None:
+                    full = full["short_of_full"]
+                c = {"kind": kind, "form": "short", "start": a, "end": b, "section": m.group("sec"),
+                     "tier": TIER_RULE, "before_full": later, "_full": full}
+                if kind == "statute":
+                    c.update({"year": None, "unreadable": _unreadable_sub(norm, m.end("sec"), b),
+                              "authority": "9.800(f)"})
+                else:
+                    c.update({"which": which, "article": m.group("num"), "amendment": False,
+                              "authority": "9.800(e)" if which == "Florida" else "9.800(o)"})
+                out.append(c)
+                ctx.append((a, which, c))       # the next short form follows this one
+                ctx.sort(key=lambda t: t[0])
+                c["short_of_full"] = full
+        for c in out:
+            c.pop("short_of_full", None)
+        return out
 
     def _cases(self, doc):
         norm = doc.norm
@@ -2015,11 +2146,22 @@ class Engine:
             for m in rx.finditer(norm):
                 which = m.group("which")
                 florida = which.lower().startswith(("fla", "florida"))
-                out.append({"kind": "constitution", "form": form, "start": m.start(), "end": m.end(),
-                            "which": "Florida" if florida else "United States",
-                            "article": m.group("num"), "section": m.groupdict().get("sec"),
-                            "amendment": "amend" in (m.groupdict().get("what") or "").lower(),
-                            "tier": TIER_RULE, "authority": "9.800(e)" if florida else "9.800(o)"})
+                g = m.groupdict()
+                c = {"kind": "constitution", "form": form, "start": m.start(), "end": m.end(),
+                     "which": "Florida" if florida else "United States",
+                     "article": m.group("num"), "section": g.get("sec"),
+                     "amendment": "amend" in (g.get("what") or "").lower(),
+                     "tier": TIER_RULE, "authority": "9.800(e)" if florida else "9.800(o)"}
+                if m.group("num").isdigit() and int(m.group("num")) in ROMAN_OF and form == "hybrid":
+                    c["arabic_fix"] = spelled_out(c, m.group(0), self.data)   # the writer wrote a sentence form
+                elif m.group("num").isdigit() and int(m.group("num")) in ROMAN_OF:
+                    # e-arabic-article's fix: the rule's form, section first, with the roman numeral
+                    sign = "§§" if (g.get("sign") or "").lower() in ("§§", "sections", "secs.") else "§"
+                    c["arabic_fix"] = (f"Art. {ROMAN_OF[int(m.group('num'))]}" + (f", {sign} {g['sec']}" if g.get("sec") else "")
+                                + (f", cl. {g['cl']}" if g.get("cl") else "")
+                                + (", Fla. Const." if florida else ", U.S. Const.")
+                                + (f" ({g['year']})" if g.get("year") else ""))
+                out.append(c)
         return out
 
     def _admin(self, norm):
@@ -2147,11 +2289,12 @@ class Engine:
         doc = Doc(source)
         doc.read_sentences(self.abbreviations)
         cites = self.extract(doc)
-        doc.sentences.overlay([(c["start"], c["end"]) for c in cites])
+        doc.read_unread(cites)
         ctx = {"doc": doc, "cites": cites, "doc_date": doc_date, "engine": self, "source": source}
         ctx["links"] = link_short_forms(doc, cites)
+        mark_unread_tails(doc, cites)
         for c in cites:
-            if c["kind"] in ("case", "case_short"):
+            if c["kind"] in ("case", "case_short", "court_document"):
                 c["toa"] = _toa_entry(doc, c)     # a table-of-authorities line, not a use of the case
         quotations = tie_quotations(doc, cites)
         ctx["quotations"] = quotations
@@ -2209,13 +2352,16 @@ class Engine:
             notes.append(f"{doc.page_name(k)} {appended['why']}, so the pages from there on are probably exhibits "
                          "or an appendix: another writer's citations and quotations, checked and listed with this "
                          f"document's. To check only the document, rerun with --last-page {k - 1}.")
+        unread = count_unread(doc, cites, appended)
+        notes += unread_notes(unread)
         if source.emphasis is None:
             notes.append("Case-name typeface (9.800(q)) can't be checked in plain text; check a .docx to cover it.")
         unclear = sum(1 for c in cites if c["kind"] == "id" and c.get("antecedent") == "unclear")
         if unclear:
             notes.append(f"{unclear} Id. citation{'s' if unclear != 1 else ''} weren't checked because what "
-                         f"{'they refer' if unclear != 1 else 'it refers'} to isn't clear to the script (a record "
-                         "cite, a quotation, an unrecognized citation, or a footnote comes between).")
+                         f"{'they refer' if unclear != 1 else 'it refers'} to isn't clear to the script (a source it "
+                         "doesn't read, such as a record cite, a report, a filing, or an unrecognized citation; a "
+                         "quotation; a footnote; or a page break comes between).")
         if quoted_pages:
             n, where = len(quoted_pages), sorted({p for p in quoted_pages if p})
             notes.append(f"{n} form departure{'s' if n != 1 else ''} inside quotations weren't reported: the quoted "
@@ -2238,6 +2384,7 @@ class Engine:
             "findings": findings,
             "citations": [_public(c) for c in cites],
             "quotations": quotations,
+            "unread": unread,
             "appended": appended,
             "notes": notes,
         }
@@ -2327,6 +2474,95 @@ def _docket(norm, start, end):
     return {"text": text, "numbers": toks}
 
 
+def _court_document(doc, c):
+    """Read a case citation as a document from that case (Indigo Book R25) when a document's title comes
+    before its name: "Initial Br. at 19, Able v. State, No. SC2020-1 (Fla. 2020)". Only the docket form, a
+    case cited by its number with a court-and-date parenthetical (the name walk takes in a title with no
+    pinpoint as part of the name). The title isn't the case's name. Its pinpoint goes after the title (R25),
+    or is read after the parenthetical, where writers also put it: "..., No. SC2020-1 (Fla. 2020), at 19".
+    Sets kind court_document, document (the title), pin, and pin_place ("title" or "after")."""
+    norm = doc.norm
+    p, name = c.get("paren"), c.get("case_name")
+    if (c["kind"] != "case" or not c.get("docket") or not name or c["reporters"] or c["flw"] or c["online"]
+            or not p or p["court"]["id"] is None or not p["year"]):
+        return
+    ns = c["name_start"]
+    v = re.search(r" (?:v|vs)\. ", name)
+    cands = [ns + m.start() for m in re.finditer(r", ", name[:v.start()] if v else name)]
+    if norm[ns - 2:ns] == ", ":
+        cands.append(ns - 2)                 # the walk stopped at the title's pinpoint: "Br. at 19, Able v. ..."
+    for q in sorted(cands):
+        title = _document_title(doc, q)
+        rest = norm[q + 2:ns + len(name)]
+        if title is None or NAME_GOES_ON.match(rest) or not rest[:1].isupper() or not (
+                re.search(r" (?:v|vs)\. \S", rest) or rest.startswith(("In re ", "Ex parte "))):
+            continue
+        start, text, pin = title
+        c.update(kind="court_document", document=text, case_name=rest, name_start=q + 2, start=start,
+                 pin=pin, pin_place="title" if pin else None)
+        if pin is None:
+            m = DOC_PIN_AFTER.match(norm, c["end"])
+            if m:
+                c.update(pin=m.group("page") or m.group("para"), pin_place="after", end=m.end())
+        return
+
+
+DOC_TITLE_REACH = 300            # characters a title may run back from its comma
+DOC_TITLE_WORDS = 25
+
+
+def _document_title(doc, q):
+    """A document's title ending at offset q, with its pinpoint: (start, title, pin) or None. The title is
+    capitalized words, numbers after an abbreviation ("Fla. R. Civ. P. 1.540"), and small connectors, after
+    any signal and a sentence's end (a period after a word that isn't an abbreviation, unless more
+    abbreviations follow it: "Court. Initial Br." but a misspelled "Fla. R. Cvl. P."); it needs a document
+    word (DOC_WORDS, DOC_WORDS_LEAD). The sentence layer isn't asked: it ends a sentence inside a rule's number."""
+    norm = doc.norm
+    bound = max(0, q - DOC_TITLE_REACH)
+    head = norm[bound:q]
+    m = DOC_PIN_BEFORE.search(head)
+    pin = (m.group("page") or m.group("para")) if m else None
+    end = q - (len(m.group(0)) if m else 0)
+    toks = list(re.finditer(r"\S+", norm[bound:end]))
+    first = len(toks)
+    abbr = doc.periods.abbr
+    for k in range(len(toks) - 1, max(-1, len(toks) - DOC_TITLE_WORDS - 1), -1):
+        t = toks[k].group(0)
+        if (t.endswith((".", "?", "!")) and not abbr.known(t[:-1])
+                and t not in DOC_WORDS | DOC_WORDS_LEAD | DOC_MODIFIERS
+                and not (k + 1 < len(toks) and toks[k + 1].group(0).endswith(".")
+                         and abbr.known(toks[k + 1].group(0)[:-1]))):
+            break                              # a sentence's end
+        if (t in DOC_SIGNALS or t.lower() in DOC_HEADINGS or re.search(r"[,;:()\"“”\[\]]", t)
+                or (k == 0 and bound and not norm[bound - 1].isspace())):
+            break
+        if t[0].isdigit():
+            # a number in the title, after an abbreviation or a word that numbers: "Fla. R. Civ. P. 1.540",
+            # "Rule 1.540"; not a table of authorities' page number before the entry
+            if not (k and re.fullmatch(r"[A-Z][\w.]*\.|Rule|Section|Count|Claim", toks[k - 1].group(0))):
+                break
+        elif not (t[0].isupper() or t in DOC_CONNECTORS):
+            break
+        first = k
+    words = [t.group(0) for t in toks[first:]]
+    while words and words[0] in DOC_CONNECTORS:
+        words.pop(0)
+        first += 1
+    if not words:
+        return None
+    lead = True                          # only a possessive, a modifier, or a document word so far
+    found = False
+    for w in words:
+        if w in DOC_WORDS or (w in DOC_WORDS_LEAD and lead):
+            found = True
+        elif not (DOC_POSSESSIVE.fullmatch(w) or w in DOC_MODIFIERS):
+            lead = False
+    if not found:
+        return None
+    start = bound + toks[first].start()
+    return start, norm[start:end], pin
+
+
 def _short_name(doc, c):
     """The party name before a short case cite ("See Fenelon, 594 So. 2d at 293" -> "Fenelon", "J.P., 900
     So. 2d at 113" -> "J.P."), taken into the citation's span. Not every short cite has one: the name may
@@ -2391,13 +2627,14 @@ def _containing(cites, start, end):
 
 
 def _public(c):
-    keep = {k: v for k, v in c.items() if k not in ("start", "end", "number_start", "name_start")}
+    keep = {k: v for k, v in c.items() if k not in ("start", "end", "number_start", "name_start", "arabic_fix")}
     return keep
 
 
 def _full_cases(ctx):
+    """Full case citations, and court documents (their case's docket and parenthetical are checked as a case's)."""
     for c in ctx["cites"]:
-        if c["kind"] == "case" and not c["in_quote"]:
+        if c["kind"] in ("case", "court_document") and not c["in_quote"]:
             yield c
 
 
@@ -2595,7 +2832,27 @@ def lc_date_on_reported(ctx, rec):
 
 
 def _statutes(ctx):
-    return [c for c in ctx["cites"] if c["kind"] == "statute" and c["form"] not in ("annotated", "fs") and not c["in_quote"]]
+    return [c for c in ctx["cites"] if c["kind"] == "statute" and c["form"] not in ("annotated", "fs", "short")
+            and not c["in_quote"]]
+
+
+def lc_constitution_short(ctx, rec):
+    """A constitution cited by article and section alone (Engine._section_shorts): it has no short form."""
+    for c in ctx["cites"]:
+        if c["kind"] == "constitution" and c.get("form") == "short" and not c["in_quote"]:
+            code = "Fla. Const." if c["which"] == "Florida" else "U.S. Const."
+            yield {"start": c["start"], "end": c["end"], "citation": c, "fix": f"{c['text']}, {code}"}
+
+
+def lc_section_short_before_full(ctx, rec):
+    """A statute's section with no code named (Engine._section_shorts) before the code is cited in full.
+    A constitution's is constitution-short's, wherever it comes."""
+    for c in ctx["cites"]:
+        if c["kind"] == "statute" and c.get("form") == "short" and c.get("before_full") and not c["in_quote"]:
+            full = ctx["cites"][c["short_of"]] if c.get("short_of") is not None else None
+            detail = (f"It reads as {'the Florida Statutes' if c['kind'] == 'statute' else 'the ' + c['which'] + ' Constitution'}"
+                      + (f", cited in full later ({_where(full['location'])}): {full['text']}." if full else "."))
+            yield {"start": c["start"], "end": c["end"], "citation": c, "detail": detail}
 
 
 STATUTE_NOTE = re.compile(r"(?:references?|citations?)\b[^.]{0,80}?(?:(\d{4}) (?:version|edition) of (?:the )?Florida Statutes|"
@@ -2716,6 +2973,26 @@ def lc_west_dca(ctx, rec):
 ROMAN = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10, "XI": 11,
          "XII": 12, "XIII": 13, "XIV": 14, "XV": 15, "XVI": 16, "XVII": 17, "XVIII": 18, "XIX": 19, "XX": 20,
          "XXI": 21, "XXII": 22, "XXIII": 23, "XXIV": 24, "XXV": 25, "XXVI": 26, "XXVII": 27}
+ROMAN_OF = {n: r for r, n in ROMAN.items()}
+SPACED_SUB = re.compile(r"(?<=[\d)]) \((?=[\w.]+\))")      # "48.031 (5) (b)", not "(1) and (3)"
+
+
+def lc_subsection_space(ctx, rec):
+    for c in _statutes(ctx):
+        sec = c["section"] or ""
+        if SPACED_SUB.search(sec):
+            text = ctx["doc"].norm[c["start"]:c["end"]]
+            yield {"start": c["start"], "end": c["end"], "citation": c,
+                   "fix": text.replace(sec, SPACED_SUB.sub("(", sec), 1)}
+
+
+def lc_arabic_article(ctx, rec):
+    for c in ctx["cites"]:
+        if c["kind"] == "constitution" and "arabic_fix" in c and not c["in_quote"]:
+            yield {"start": c["start"], "end": c["end"], "citation": c, "fix": c["arabic_fix"],
+                   "authority": "9.800(e)(1)" if c["which"] == "Florida" else "9.800(o)(1)"}
+
+
 ORDINAL_WORDS = ["", "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth",
                  "Eleventh", "Twelfth", "Thirteenth", "Fourteenth", "Fifteenth", "Sixteenth", "Seventeenth",
                  "Eighteenth", "Nineteenth", "Twentieth", "Twenty-first", "Twenty-second", "Twenty-third",
@@ -2725,21 +3002,26 @@ ORDINAL_WORDS = ["", "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Se
 def spelled_out(c, text, data):
     """The sentence form of an abbreviated citation (9.800's introductory paragraph), or None."""
     k = c["kind"]
-    if k == "constitution" and c["form"] == "abbreviated":
+    if k == "constitution" and c["form"] in ("abbreviated", "hybrid"):
         if c["amendment"]:
             n = ROMAN.get(c["article"].upper())
             return f"the {ORDINAL_WORDS[n]} Amendment to the United States Constitution" if n else None
-        m = re.match(r"[Aa]rt(?:\.|icle) ([IVXL]+)(?:, §§? ?([^,]+))?(?:, cl\. (\d+))?", text)
+        m = re.match(r"[Aa]rt(?:\.|icle) ([IVXL]+|\d+)(?:,? (§§?|[Ss]ec(?:tions?|s?\.)) ?(.+?)"
+                     r"(?=,? of the |, cl\.|\.?,? (?:Fla\.|U\.S\.) Const|$))?(?:, cl\. (\d+))?", text)
         if not m:
             return None
-        out = f"article {m.group(1)}"
-        if m.group(2):
-            out += f", section {m.group(2)}"
+        num = m.group(1) if not m.group(1).isdigit() else ROMAN_OF.get(int(m.group(1)))
+        if num is None:
+            return None
+        out = f"article {num}"
         if m.group(3):
-            out += f", clause {m.group(3)}"
+            plural = m.group(2).lower() in ("§§", "sections", "secs.") or re.search(r", \d", m.group(3))
+            out += f", {'sections' if plural else 'section'} {m.group(3)}"
+        if m.group(4):
+            out += f", clause {m.group(4)}"
         return out + (" of the Florida Constitution" if c["which"] == "Florida" else " of the United States Constitution")
     if k == "statute" and c["form"] in ("abbreviated", "hybrid"):
-        m = re.match(r"(§§|§|[Ss]ections|[Ss]ection) ?(.+?),? (?:Fla\. Stats?\.?|Florida Statutes)(?: \((.+)\))?$", text, re.I)
+        m = re.match(r"(§§|§|[Ss]ections|[Ss]ection) ?(.+?),? (?:Fla\.? Stats?\.?|Florida Statutes)(?: \((.+)\))?$", text, re.I)
         if not m:
             return None
         word = "sections" if m.group(1).lower() in ("§§", "sections") else "section"
@@ -2752,15 +3034,20 @@ def spelled_out(c, text, data):
     if k == "admin_code" and c["form"] == "abbreviated":
         return f"Florida Administrative Code Rule {c['rule']}"
     if k == "session_law" and c["form"] == "abbreviated":
-        m = re.match(r"[Cc]h(?:\.|apter) ([\d-]+)(?:, § ?(\d+))?", text)
-        return f"chapter {m.group(1)}" + (f", section {m.group(2)}" if m.group(2) else "") + ", Laws of Florida"
+        m = re.match(r"[Cc]h(?:\.|apter) ([\d-]+)(?:, (§§?) ?(.+?))?, Laws of Fla\.", text)
+        if not m.group(3):
+            return f"chapter {m.group(1)}, Laws of Florida"
+        word = "sections" if m.group(2) == "§§" or ", " in m.group(3) else "section"
+        return f"chapter {m.group(1)}, {word} {m.group(3)}, Laws of Florida"
     return None
 
 
-def _mark_record(norm, c, prev, cites):
+def _mark_record(doc, c, prev, cites):
     """Mark an Id. that repeats a record cite (Indigo Book R26): one between it and the citation before
-    it (or the document's start), or an Id. just before it that does. record_para: the record cite is
-    to a paragraph ("Smith Aff. ¶ 78")."""
+    it (or the document's start), or an Id. just before it that does, with nothing else the script can't
+    read between (fl_sentence.Unread.between). record_para: the record cite is to a paragraph ("Smith
+    Aff. ¶ 78")."""
+    norm = doc.norm
     gap = _gap(norm, prev["end"] if prev else 0, c["start"], cites)
     recs = [m.end() for rx in (RECORD_RX, TRANSCRIPT_RX) for m in rx.finditer(gap)]
     pin = ID_TRANSCRIPT_PIN.match(norm, c["start"])
@@ -2771,7 +3058,8 @@ def _mark_record(norm, c, prev, cites):
         last = max(recs) if recs else None
         c["record"] = True
         c["record_para"] = bool(last is not None and re.match(r"[\s,]*¶", gap[last:last + 6]))
-    elif prev and prev["kind"] == "id" and prev.get("record") and not (" v. " in gap or UNSEEN_CITE.search(gap)):
+    elif (prev and prev["kind"] == "id" and prev.get("record")
+          and not any(s.name not in ("record", "transcript") for s in doc.unread.between(prev["end"], c["start"]))):
         c["record"], c["record_para"] = True, prev.get("record_para")
 
 
@@ -2805,6 +3093,31 @@ def lc_record_cite_form(ctx, rec):
                      "(Id. ¶ 79, not Id. at 79)")
     yield {"start": spans[0][0], "end": spans[0][1], "count": len(spans), "occurrences": spans,
            "detail": "Found: " + "; ".join(parts) + "."}
+
+
+def lc_document_pin_order(ctx, rec):
+    """A document from another case whose pinpoint follows the case's parenthetical (_court_document's
+    pin_place "after"): it goes after the title (Indigo Book R25). The fix moves it there."""
+    norm = ctx["doc"].norm
+    for c in ctx["cites"]:
+        if c["kind"] != "court_document" or c["in_quote"] or c.get("toa") or c.get("pin_place") != "after":
+            continue
+        pin = c["pin"] if c["pin"].startswith("¶") else "at " + c["pin"]
+        fix = c["document"] + " " + pin + ", " + norm[c["name_start"]:c["paren"]["end"]]
+        yield {"start": c["start"], "end": c["end"], "citation": c, "fix": fix}
+
+
+def lc_id_court_document(ctx, rec):
+    """Id. citations that refer to a document from another case (Indigo Book R26: avoid Id. for them), reported
+    once per document, like record_cite_form. No fix: the short form is the writer's to choose."""
+    ids = [info["cite"] for info in ctx["links"]["ids"]
+           if info["antecedent"] is not None and info["antecedent"]["kind"] == "court_document"]
+    if not ids:
+        return
+    spans = [(c["start"], c["end"]) for c in ids]
+    n = len(ids)
+    yield {"start": spans[0][0], "end": spans[0][1], "citation": ids[0], "count": n, "occurrences": spans,
+           "detail": f"Found: {n} Id. citation{'s' if n != 1 else ''} referring to a document from another case."}
 
 
 # An ellipsis that isn't three spaced periods: "...", "....", "…". In a filer's own quotation the
@@ -2895,6 +3208,8 @@ def lc_in_sentence(ctx, rec):
             continue
         text = norm[c["start"]:c["end"]]
         fix = spelled_out(c, text, ctx["engine"].data)
+        if fix is not None and fix == c.get("arabic_fix"):
+            continue                           # e-arabic-article reports it, with the same fix
         yield {"start": c["start"], "end": c["end"], "citation": c, "fix": fix}
 
 
@@ -2913,7 +3228,8 @@ def lc_case_name_typeface(ctx, rec):
         return k >= 0 and emph[k][0] <= r < emph[k][1]
 
     for c in ctx["cites"]:
-        if c["kind"] != "case" or c["in_quote"] or not c.get("case_name") or " v. " not in c["case_name"]:
+        if (c["kind"] not in ("case", "court_document") or c["in_quote"] or not c.get("case_name")
+                or " v. " not in c["case_name"]):
             continue
         ns = c["name_start"]
         v = ns + c["case_name"].index(" v. ") + 1
@@ -3121,20 +3437,20 @@ def link_short_forms(doc, cites):
         if c["is_case"]:
             links["supras"].append({"cite": c, "full": matches[0] if len(keys) == 1 else None})
 
-    # Id.: what it refers to is the preceding citation, if nothing the script can't see comes between.
+    # Id.: what it refers to is the preceding citation, if nothing the script can't see comes between:
+    # nothing that looks like an authority it didn't read (fl_sentence.Unread.between: a record cite, a
+    # short name with a page, a date parenthetical, a case named in the text, ...).
     prev = earlier = None
     for c in top:
         if c["kind"] == "id" and not c["in_quote"]:
             info = {"cite": c, "prev": prev, "antecedent": None, "string": None}
             c["antecedent"] = "unclear"
-            _mark_record(norm, c, prev, cites)
+            _mark_record(doc, c, prev, cites)
             if prev is not None:
-                gap = _gap(norm, prev["end"], c["start"], cites)
-                bare = _strip_parens(gap)
                 broken = prev["kind"] == "case" and prev["paren"] is None    # cut off, as by a page break
-                transcript = TRANSCRIPT_RX.search(gap) or ID_TRANSCRIPT_PIN.match(norm, c["start"])
-                if not (prev["in_quote"] or broken or RECORD_RX.search(gap) or UNSEEN_CITE.search(gap) or transcript
-                        or " v. " in bare or "supra" in bare or doc.stream(prev["start"]) != doc.stream(c["start"])):
+                if not (prev["in_quote"] or broken or ID_TRANSCRIPT_PIN.match(norm, c["start"])
+                        or doc.unread.between(prev["end"], c["start"])
+                        or doc.stream(prev["start"]) != doc.stream(c["start"])):
                     if size[prev["group"]] > 1:
                         info["string"] = size[prev["group"]]
                         c["antecedent"] = "string"
@@ -3199,12 +3515,149 @@ def _unseen_footnote(doc, earlier, prev, c, cites):
     return n is not None and p is not None and e is not None and e <= n < p
 
 
+def mark_unread_tails(doc, cites):
+    """A citation whose text goes on past what the script read: authority signs in its attached text
+    (fl_sentence.Unread.attached), outside its parentheticals, as in "Initial Br., Able v. State, No. 1 (Fla.
+    2020), at 19", a filing's page after the parenthetical the reader ends a case at. Its reading is
+    incomplete. Sets unread_tail: the signs' names. A short name ("[hereinafter Able Br.]") is no sign of
+    that. When a sign may hold a page (unread_pin), checks that depend on its pinpoint don't fire on it; a
+    date parenthetical the reader didn't take in ("5, n.1 (Fla. 2004)") can't hide one."""
+    tops = [c for c in cites if c.get("nested_in") is None and not c["in_quote"]]
+    for c, nxt in zip(tops, tops[1:] + [None]):
+        stop = nxt["start"] if nxt is not None else len(doc.norm)
+        names = []
+        for s in doc.unread.unread(c["end"], doc.unread.attached(c["end"], stop)):
+            if s.name not in ("hereinafter", "case name") and doc.brackets.depth(c["end"], s.start) == 0 \
+                    and s.name not in names:
+                names.append(s.name)
+        if names:
+            c["unread_tail"] = names
+
+
+PAGE_SIGNS = ("pinpoint", "record", "transcript")
+
+
+def unread_pin(c):
+    """May the citation's pinpoint be in text after it that the script didn't read (mark_unread_tails)?"""
+    return any(n in PAGE_SIGNS for n in c.get("unread_tail", ()))
+
+
+def _pin_unread(c, cites, depth=0):
+    """Would the pinpoint a citation gives (directly, or through the citation an Id. repeats) come from text
+    the script didn't read (mark_unread_tails)?"""
+    if unread_pin(c):
+        return True
+    if c["kind"] == "id" and not c.get("pin"):
+        a = c.get("repeats", c.get("antecedent"))
+        return isinstance(a, int) and depth < 20 and _pin_unread(cites[a], cites, depth + 1)
+    return False
+
+
+RECORD_SIGNS = {"record", "transcript"}
+# A record cite standing alone is also a citation clause ("See R. 45.") and may read as a pinpoint ("IB. at 29").
+RECORD_ALSO = {"clause", "pinpoint"}
+# A table-of-authorities line: leader dots or a tab, then pages.
+TOA_TAIL = re.compile(r"(?:\.{4,}|…{2,}|\t)\s*(?:\d+(?:\s*[,&\-–]\s*\d+)*|passim)\s*$")
+LEADERS = re.compile(r"\.{4,}|…{2,}")
+
+
+def count_unread(doc, cites, appended=None):
+    """What the script didn't read, to count: each authority it can't read, once (fl_sentence.Unread.
+    unread_spans), in the filing's body. Not in exhibits or an appendix (appended), the certificates at the
+    end (END_MATTER), or a table-of-authorities line, and not a date parenthetical that only goes on from a
+    citation the script read ("5, n.1 (Fla. 2004)") or a short name in its attached text ("..., at 19 [hereinafter
+    Able Br.]"), the citation's own. Each is a dict: kind ("record" for a record or
+    transcript cite, else "authority"), signs (what found it), text, after (the index of the citation whose
+    text it goes on from, or None), and location."""
+    norm = doc.norm
+    ends = [m.start() for m in END_MATTER.finditer(norm) if m.start() > len(norm) // 2]
+    stop = ends[0] if ends else len(norm)
+    index = {(c["start"], c["end"]): c["index"] for c in cites}
+    top_ends = sorted(c["end"] for c in cites if c.get("nested_in") is None and not c["in_quote"])
+    out = []
+    for g in doc.unread.unread_spans():
+        a, b = g["start"], g["end"]
+        signs = set(g["signs"])
+        if a >= stop or (g["after"] and signs == {"date"}) or _toa_line(doc, a, b):
+            continue
+        if signs == {"hereinafter"}:
+            k = bisect.bisect_right(top_ends, a) - 1
+            if k >= 0 and doc.unread.attached(top_ends[k], len(norm)) >= b:
+                continue
+        loc = doc.location(a, b)
+        if appended and (loc.get("page") or 0) >= appended["page"]:
+            continue
+        kind = "record" if signs & RECORD_SIGNS and signs <= RECORD_SIGNS | RECORD_ALSO else "authority"
+        out.append({"kind": kind, "signs": g["signs"], "text": norm[a:b],
+                    "after": index.get(g["after"]) if g["after"] else None, "location": loc})
+    return out
+
+
+def _toa_line(doc, a, b):
+    """Is text[a:b] in a table of authorities: leader dots in it, or its line ending in them and pages?"""
+    if LEADERS.search(doc.norm, a, b):
+        return True
+    nl = doc.raw.find("\n", doc.raw_pos(b - 1) + 1)
+    ls = doc.raw.rfind("\n", 0, doc.raw_pos(a)) + 1
+    return bool(TOA_TAIL.search(doc.raw[ls:nl if nl != -1 else len(doc.raw)]))
+
+
+def unread_notes(unread):
+    """The count's two notes (count_unread): authorities the script can't read, and record cites."""
+    out = []
+    auth = [u["location"] for u in unread if u["kind"] == "authority"]
+    rec = [u["location"] for u in unread if u["kind"] == "record"]
+    if auth:
+        n = len(auth)
+        out.append(f"Not checked: {n} passage{'s' if n != 1 else ''} that look{'' if n != 1 else 's'} like "
+                   f"{'citations' if n != 1 else 'a citation'} the script doesn't read (secondary sources, "
+                   "legislative materials, web pages, filings, or citations in forms it doesn't know), "
+                   f"{_places(auth)}. Check {'them' if n != 1 else 'it'} by hand.")
+    if rec:
+        n = len(rec)
+        out.append(f"Not checked: {n} record or transcript cite{'s' if n != 1 else ''}, {_places(rec)}. The "
+                   "script checks only their paragraph signs and an Id. after one; a court's own rules govern "
+                   "their form.")
+    return out
+
+
+PLACES = 12                     # page ranges (or lines) a note lists before "and N more"
+
+
+def _places(locs):
+    """Where a count's passages are, compactly: "pp. 4, 6, 10-12" (printed pages, when every one has
+    one), "PDF pp. 3, 9", "lines 4, 20", or a .docx's "para. 3, fn. 2"."""
+    if all("page" in loc for loc in locs):
+        printed = [loc.get("printed_page", "") for loc in locs]
+        if all(p.isdigit() for p in printed):
+            nums, head = [int(p) for p in printed], "p"
+        else:
+            nums, head = [loc["page"] for loc in locs], "PDF p"
+        nums = sorted(set(nums))
+        runs = []
+        for n in nums:
+            if runs and n == runs[-1][1] + 1:
+                runs[-1][1] = n
+            else:
+                runs.append([n, n])
+        parts = [str(a) if a == b else f"{a}-{b}" for a, b in runs]
+        head += "p." if len(nums) > 1 else "."
+    elif all("line" in loc for loc in locs):
+        parts = [str(n) for n in sorted({loc["line"] for loc in locs})]
+        head = "lines" if len(parts) > 1 else "line"
+    else:
+        parts = list(dict.fromkeys(_where(loc) for loc in locs))
+        head = ""
+    more = f" and {len(parts) - PLACES} more" if len(parts) > PLACES else ""
+    return ("on " + head + " " if head else "at ") + ", ".join(parts[:PLACES]) + more
+
+
 def _antecedent(prev, cites):
     k = prev["kind"]
     if k == "id":
         a = prev.get("antecedent")
         return cites[a] if isinstance(a, int) else None
-    if k == "case":
+    if k in ("case", "court_document"):
         return prev
     if k == "case_short":
         return cites[prev["refers_to"]] if prev.get("refers_to") is not None else prev
@@ -3249,7 +3702,7 @@ def quotation_pin(c, cites, depth=0):
     if k == "case":
         own = c["reporters"][0]["pins"] if c["reporters"] else (c["flw"] or c["online"] or {}).get("pins", [])
         return (own or c["pins"] or [None])[0]
-    if k in ("case_short", "supra"):
+    if k in ("case_short", "supra", "court_document"):
         return c.get("pin")
     if k == "id":
         if c.get("pin"):
@@ -3384,10 +3837,11 @@ def tie_quotations(doc, cites):
                 c, gap = usable[k], norm[close:usable[k]["start"]]
                 if QUOTE_THEN_CITE.fullmatch(gap):
                     q["citation"], q["attributed_by"] = c["index"], "follows"
-                elif (not block and not RECORD_RX.search(gap) and re.match(r"[,;:]?\s+[a-z]", gap)
+                elif (not block and not doc.unread.unread(close, c["start"]) and re.match(r"[,;:]?\s+[a-z]", gap)
                       and sents.same_sentence(close - 1, close)):
                     # the quotation's own sentence goes on, then ends, and the citation opens the next:
-                    # '"..." and reversed. Smith, ...'. No other quotation or parenthesis on the way.
+                    # '"..." and reversed. Smith, ...'. No other quotation or parenthesis on the way, and
+                    # nothing that looks like an authority the script didn't read (fl_sentence.Unread).
                     end = sents.end(close)
                     if (end is not None and end - close <= SENTENCE_REACH and not re.search(r"[\"()]", norm[close:end])
                             and sents.index(c["start"]) == sents.index(end) + 1
@@ -3404,11 +3858,13 @@ def tie_quotations(doc, cites):
         if q["citation"] is None and not q["note"] and not q["block"] and not nxt["block"]:
             gap = norm[q["_end"] + 1:nxt["_start"] - 1]
             if (len(gap) <= 120 and not re.search(r"[()]", gap) and nxt["citation"] is not None
-                    and sents.same_sentence(q["_end"], nxt["_start"] - 1)):
+                    and sents.same_sentence(q["_end"], nxt["_start"] - 1)
+                    and not doc.unread.unread(q["_end"], nxt["_start"])):
                 q["citation"], q["attributed_by"] = nxt["citation"], "same sentence"
     # 4. A quotation after a textual citation that frames its clause (fl_sentence.Sentences.frames): 'In Able v.
     # Baker, 1 So. 3d 2 (Fla. 2001), the court held that "..."'; 'Section 1, Fla. Stat., provides that "..."'.
-    # In the citation's clause, with no record cite and no quotation tied elsewhere between, and no citation
+    # In the citation's clause, with nothing between that looks like an authority the script didn't read
+    # (fl_sentence.Unread.between: a record cite, a report, ...) and no quotation tied elsewhere, and no citation
     # after it in its sentence, whose quotation it might be. Not an Id., which the writer's words never name.
     tops = [c for c in usable if c.get("nested_in") is None]
     top_ends = [c["end"] for c in tops]
@@ -3423,7 +3879,7 @@ def tie_quotations(doc, cites):
         nxt = tops[k + 1] if k + 1 < len(tops) else None
         if (c["kind"] == "id" or o - c["end"] > FRAME_REACH or doc.stream(c["start"]) != doc.stream(o)
                 or not sents.same_sentence(c["end"] - 1, o) or sents.clause_start(o) != sents.clause_start(c["start"])
-                or not sents.frames(c["start"]) or RECORD_RX.search(norm, c["end"], o)
+                or not sents.frames(c["start"]) or doc.unread.between(c["end"], o)
                 or (nxt is not None and sents.same_sentence(q["_end"], nxt["start"]))
                 or any(c["end"] <= p["_start"] < o and p["citation"] != c["index"] for p in out)):
             continue
@@ -3434,21 +3890,23 @@ def tie_quotations(doc, cites):
             continue
         c = cites[q["citation"]]
         q["pin"] = quotation_pin(c, cites)
-        if c["kind"] == "case":
+        if c["kind"] in ("case", "court_document"):
             q["refers_to"] = c["index"]
         elif c.get("refers_to") is not None:
             q["refers_to"] = c["refers_to"]
         elif c["kind"] in ("id", "case_short", "supra"):
-            q["note"] = (f"tied to {c['text']}, but what that refers to isn't clear to the script "
-                         "(it may be the record); find the source by hand")
+            q["note"] = (f"tied to {c['text']}, but the script can't tell what that refers to; "
+                         "find the source by hand")
         # A quotation from a case needs the page it's on (Indigo Book R11.7): quote-no-pin. Not when it's tied
         # to subsequent history ("..., 41 (Fla. 5th DCA 1981), approved, 419 So. 2d 1041 (Fla. 1982) ("...")"),
-        # where the page may be the main citation's.
-        q["no_pin"] = q["refers_to"] is not None and not q["pin"] and c.get("history_of") is None
+        # where the page may be the main citation's; nor when the page may be in text after the citation that
+        # the script didn't read (_pin_unread): "Initial Br., Able v. State, No. 1 (Fla. 2020), at 19".
+        q["no_pin"] = (q["refers_to"] is not None and not q["pin"] and c.get("history_of") is None
+                       and not _pin_unread(c, cites))
     return out
 
 
-PAREN_KINDS = ("case", "statute", "constitution", "rule", "admin_code", "session_law", "ag_opinion")
+PAREN_KINDS = ("case", "court_document", "statute", "constitution", "rule", "admin_code", "session_law", "ag_opinion")
 PAREN_REACH = 1000
 
 
@@ -3557,7 +4015,7 @@ def lc_id_after_string(ctx, rec):
 def lc_id_antecedent(ctx, rec):
     for info in ctx["links"]["ids"]:
         c, ant = info["cite"], info["antecedent"]
-        if ant is None or not c["pin"]:
+        if ant is None or not c["pin"] or unread_pin(c):
             continue
         what = ctx["doc"].norm[ant["start"]:ant["end"]]
         if c["pin_kind"] == "page" and ant["kind"] in SECTION_KINDS:
@@ -3573,8 +4031,8 @@ def lc_pin_before_first_page(ctx, rec):
     cites = ctx["cites"]
     for c in _full_cases(ctx):
         first = _first_page(c)
-        if first is None or c["flw"] or c["online"] or len(c["reporters"]) != 1:
-            continue
+        if first is None or c["flw"] or c["online"] or len(c["reporters"]) != 1 or unread_pin(c):
+            continue                       # an unread tail: its pinpoints may not be what the script read
         for p in c["pins"]:
             n = _number(p)
             if n is not None and n < first:
@@ -3583,7 +4041,7 @@ def lc_pin_before_first_page(ctx, rec):
                 break
     for e in ctx["links"]["shorts"]:
         c = e["cite"]
-        if not e["earlier"] or not c["reporters"] or not e["named"]:
+        if not e["earlier"] or not c["reporters"] or not e["named"] or unread_pin(c):
             continue                       # without a name, an early pinpoint may mean another case in the volume
         firsts = [_first_page(f, c["reporters"][0]["canonical"]) for f in e["earlier"]]
         n = _number(c["pin"])
@@ -3592,7 +4050,7 @@ def lc_pin_before_first_page(ctx, rec):
                    "detail": f"Pinpoint {c['pin']} comes before the case's first page, {min(firsts)}."}
     for info in ctx["links"]["ids"]:
         c, ant = info["cite"], info["antecedent"]
-        if ant is None or c["pin_kind"] != "page":
+        if ant is None or c["pin_kind"] != "page" or unread_pin(c):
             continue
         canonical = None
         if ant["kind"] == "case_short":
@@ -3647,7 +4105,7 @@ def lc_short_volume(ctx, rec):
 def lc_short_missing_at(ctx, rec):
     cites = ctx["cites"]
     for c in cites:
-        if not c.get("missing_at") or c["in_quote"] or c.get("toa"):
+        if not c.get("missing_at") or c["in_quote"] or c.get("toa") or unread_pin(c):
             continue
         r = c["reporters"][0]
         f = cites[c["refers_to"]] if c.get("refers_to") is not None else None
@@ -3744,7 +4202,7 @@ def render_text(report, show_citations=False):
         out.append("")
         out.append("CITATIONS")
         for c in report["citations"]:
-            out.append(f"  {_where(c['location']):<10} {c['kind']:<13} {c['authority']:<12} {c['text']}")
+            out.append(f"  {_where(c['location']):<10} {c['kind']:<14} {c['authority']:<12} {c['text']}")
     if report["notes"]:
         out.append("")
         for note in report["notes"]:

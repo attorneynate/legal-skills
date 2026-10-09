@@ -15,6 +15,9 @@ Here it's decided once, in layers built once per document:
    writer's sentences (quotations' own sentence ends aside), so two offsets can be asked whether they
    share one; and, with the citations overlaid after extraction, what governs a citation in its sentence
    and whether the sentence ends with it.
+4. Unread authorities (Unread), with the citations overlaid: text that looks like an authority where no
+   recognized citation is, so a claim about what lies between two citations can be withheld when the
+   script can't see all of it, and what it can't read can be counted.
 
 Works on any text: the normalized document or a page's raw lines. Standard library only.
 """
@@ -45,12 +48,16 @@ GENERAL = {
     # The older form of County, which the table gives as Cnty., and its plural (the table's own plurals are
     # derived): "Real Prop. in Able & Baker Ctys. in State of Ala.".
     "Ctys",
+    # Commercial (Table T6): "Com. P'ship 8098 Ltd. P'ship v. ...", "Able Com. Bank v. Baker". Unknown, it read
+    # as a word ending a sentence, splitting the case name.
+    "Com",
 }
 # Multi-word forms no table holds, read as one abbreviation: "Fla. Stat." doesn't end at "Fla.".
 GENERAL_PHRASES = [
     "Fla. Stat.", "Fla. Stat. Ann.", "Fla. Const.", "U.S. Const.", "Fla. Admin. Code", "Fla. Admin. Code Ann.",
     "Laws of Fla.", "Op. Att'y Gen.", "Ops. Att'y Gen.", "Fed. Reg.", "Cong. Rec.", "Fed. R. Civ. P.",
     "Fed. R. Crim. P.", "Fed. R. App. P.", "Fed. R. Evid.", "S. Ct.", "L. Ed.", "Cty. Ct.", "Cir. Ct.",
+    "Am. Jur.",                       # the treatise: "70 Am. Jur. 2d Sheriffs § 57 (1987)" isn't two sentences
 ]
 # Capitalized words that start a sentence and never continue an abbreviation's citation or name:
 # after "Fla. Stat." or "Inc.", one of these means the period ended the sentence too.
@@ -617,3 +624,338 @@ class Sentences:
         c = self.clause_start(i)
         m = FRAME_LEAD.fullmatch(self.text[c:i])
         return bool(m) and not (m.group(1) and set(m.group(1).lower().split()) & NOT_GOVERNING)
+
+
+# ---------------------------------------------------------------- layer 4: authorities the script didn't read
+# Record and appendix cites ("Trial R.19", "(R. 45)", "(V3 T. 120)", "App. 12", "I.B. at 5"), which an
+# Id. may follow (wrongly, Indigo Book R26), though the script doesn't extract them.
+RECORD_RX = re.compile(r"(?<![\w.])(?:(?:Trial|Supp\.|Vol\.|V\d+|[IVX]+|PC|Post-?conviction)\s?)?"
+                       r"(?:R|T|TR|Tr|SR|PCR|PC-R|ROA|App|Appx|A|Ex|SA|I\.?B|A\.?B|R\.?B|Doc|ECF(?: No)?)\.? ?"
+                       r"(?:at |p\. ?|pp\. ?|\d+:)?\d+")
+# Depositions, transcripts, affidavits, and exhibits in a trial-court filing ("Dep. A. Smith, at 12:4-6",
+# "Smith Dep. 12:4", "Hr'g Tr. 5", "Aff. ¶ 3", 'Exhibit "C"'), and any page:line pinpoint. An Id. after one
+# of these refers to it, not to the case or statute before it.
+TRANSCRIPT_RX = re.compile(r"(?<![\w.])(?:Dep(?:o)?\.|Deposition|Tr\.|Transcript|Aff\.|Affidavit|Decl\.|Declaration)(?=[\s,])"
+                           r"|\b(?:Exhibit|Ex\.) [\"“]?[A-Z0-9]{1,3}\b"
+                           r"|(?<![\d:])\d{1,4}: ?\d{1,2}(?:-\d{1,4}(?::\d{1,2})?)?(?![\d:])")
+# A page:line that is a time of day: "at 10:30 a.m.", "9:15 p.m.", "at 3:00 o'clock".
+CLOCK = re.compile(r"\s?(?:[ap]\.\s?m\.|[ap]m\b|o'clock)", re.I)
+
+YEAR = r"(?:1[6-9]|20)\d\d"
+MONTH = (r"(?:Jan(?:uary|\.)|Feb(?:ruary|\.)|Mar(?:ch|\.)|Apr(?:il|\.)|May|June?\.?|July?\.?|Aug(?:ust|\.)"
+         r"|Sept?(?:ember|\.)|Oct(?:ober|\.)|Nov(?:ember|\.)|Dec(?:ember|\.))")
+# Words before ", at 3" that make it a time or a place, not a pinpoint: "on Friday, at 3.", "in May, at 2."
+NOT_TITLES = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "January", "February",
+              "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
+              "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec", "Noon", "Midnight"}
+# Titles of documents and reports, which may take a page with no "at": "Staff Analysis 4", "Annual Report 12".
+DOCUMENT_WORDS = (r"(?:Report|Analysis|Study|Memorandum|Memo|Mem\.|Brief|Br\.|Motion|Mot\.|Petition|Pet\.|Response"
+                  r"|Resp\.|Reply|Complaint|Compl\.|Order|Opinion|Op\.|Answer|Statement|Testimony|Letter|Survey"
+                  r"|Bulletin|Manual|Handbook|Guide|Journal|Jour\.|Notice|Transcript|Hr'g|Hearing|Summary|Minutes)")
+# What may follow a pinpoint's number for it to be one: more pages, a footnote, then the end of its clause or
+# a parenthetical or a short name ("at 19 [hereinafter Able Br.]"). Not a word: "at 3 the court", "at 3 p.m.".
+PIN_END = (r"(?:[-–]\d+)?(?:, ?\d+(?:[-–]\d+)?)*(?: nn?\. ?\d+(?:[-–]\d+)?| & nn?\. ?\d+)?"
+           r"(?=\s*(?:[.;,)\]]|\(|\[hereinafter\b|$))")
+PIN_AT = r"at (?:pp?\. ?)?\*?\d+" + PIN_END
+# A docket outside a citation: "Case No. 2019-CA-1234", "No. 81,234", "No. SC20-123", "No. 1:20-cv-123".
+DOCKET_RX = re.compile(r"(?<![\w.])(?:Case|Docket|Appeal|Cause) (?:Nos?\.|Numbers?):? ?[A-Z\d][\w\-–:/]*\d"
+                       r"|(?<![\w.])Nos?\. ?(?:[A-Z]{0,4}\d+(?:[-–:][A-Za-z\d]+)+|\d{1,3}(?:,\d{3})+|\d{5,})(?!\d)")
+# Authority signs: shapes that say a passage cites something, whatever its kind. Each is narrow enough to
+# leave running text alone ("at 3 p.m.", "(2) the court", "in 2012"); what the shape alone can't rule out
+# (a time, a bar number, the filing's own docket) is ruled out in Unread._keep.
+SIGNS = [
+    ("record", RECORD_RX),
+    # Record cites in other shapes: "R-12", "PCR-3:10-11", "S.R. 25", "SC/12-13".
+    ("record", re.compile(r"(?<![\w.\-])(?:[A-Z]{1,4}\.? ?)?R ?-\d+|(?<![\w.])S\.R\. ?\d+"
+                          r"|(?<![\w/])[A-Z]{1,4}/\d+(?:[-–]\d+)?\b")),
+    ("transcript", TRANSCRIPT_RX),
+    # A pinpoint after a titled phrase or a parenthetical: "Agency Report, at 3", "(Fla. 2020), at 19",
+    # "Def.'s Mot. at 12", "U.S. at 825", "Staff Analysis 4", "Annual Report at 3". After an abbreviation
+    # the page needn't end its clause ("Def.'s Mot. at 12 argues"); elsewhere it must.
+    ("pinpoint", re.compile(r"(?<=\)),? " + PIN_AT
+                            + r"|\b(?P<title>[A-Z][\w'&\-]*)\.?, " + PIN_AT
+                            + r"|\b[A-Z][A-Za-z.']*\.(?: ?\d?[a-z]{0,2})? at (?:pp?\. ?)?\*?\d+(?![\d:])"
+                            + r"|\b" + DOCUMENT_WORDS + r",? (?:" + PIN_AT + r"|\d+" + PIN_END + r")")),
+    # A date parenthetical: "(2012)", "(Jan. 2016)", "(Mar. 1, 2020)", "(Spring 2019)", or a court, an
+    # editor, or an edition before the year: "(Fla. Dep't of Corr. 2016)", "(Amy Able ed., 1997)".
+    ("date", re.compile(r"\((?:" + MONTH + r" (?:\d{1,2}, ?)?|(?:Spring|Summer|Fall|Autumn|Winter) )?" + YEAR + r"\)"
+                        r"|\((?=[A-Z\d])[^()]{0,80}?[.,] ?" + YEAR + r"\)")),
+    ("visited", re.compile(r"\(last (?:visited|accessed|updated)\b[^()]{0,60}\)|\bavailable at\b", re.I)),
+    ("url", re.compile(r"(?<![@\w])(?:https?://|www\.)[^\s<>\"”)\]]+"
+                       r"|(?<![@\w./\-])[a-z][\w\-]*(?:\.[\w\-]+)*\.(?:gov|org|com|edu|net|us)(?:/[^\s<>\"”)\]]*)?(?![\w@])")),
+    # A source's short name, in the Bluebook's brackets: "[hereinafter Agency Report]". Not a defined term
+    # in parentheses: '(hereinafter "the Account")'.
+    ("hereinafter", re.compile(r"\[hereinafter\b[^\]]{0,100}\]")),
+    # supra after a name or before a note or page: "Able et al., supra, at 4", "supra note 3". Not a pointer
+    # inside this document: "as set forth supra,", "(supra Part II.B)".
+    ("supra", re.compile(r"(?<=,) supra\b|\bsupra(?=,? (?:note|at) \d)")),
+    ("docket", DOCKET_RX),
+    # A case named with no citation recognized: "As Able v. Baker explained". Usually one cited elsewhere,
+    # so not counted as unread (UNCOUNTED); but an Id. after it may mean it.
+    ("case name", re.compile(r"\b[A-Z][\w'&.\-]*,? v\. [A-Z]")),
+]
+# Signs that withhold a claim across them but aren't authorities the count should list.
+UNCOUNTED = {"case name"}
+# What may follow a citation and still be part of it: a pinpoint, a footnote, a short name, subsequent
+# history's words, punctuation. Its parentheticals and the citations nested in them are skipped whole.
+ATTACHED = re.compile(r"\s+|[,&]|(?:at )?(?:pp?\. ?)?\*?\d+(?:[-–]\d+)?|nn?\. ?\d+|\[hereinafter\b[^\]]{0,100}\]"
+                      r"|(?:aff'd|rev'd|affirmed|reversed|approved|quashed|disapproved|vacated|modified|cert\."
+                      r"|denied|granted|dismissed|declined|reh'g|review|in part|on other grounds|per curiam|mem\.)"
+                      r"(?![\w'])")
+# A clause a signal opens: "See ", "see also, e.g., ", "Cf. ", "But see ", "E.g., ".
+SIGNAL_CLAUSE = re.compile(r"(?:see(?:,? also| generally)?|cf\.|compare|accord|contra|but (?:see|cf\.)|e\.g\.,?)"
+                         r"(?:,? e\.g\.,?)?,?\s+", re.I)
+# What a signal may point to inside this document rather than at an authority: "See Part II.A", "see above".
+CROSS_REFERENCE = re.compile(r"(?:Parts?|Points?|Sections? (?:[IVX]+|[A-Z])\b|Arguments?|Issues?|Statement|Introduction"
+                             r"|Summary|Background|Conclusion|notes?\b|n\.|infra|supra|above|below|discussion)\b")
+# Words a citation of something the script doesn't read may hold besides titles, names, and numbers.
+TITLE_WORDS = {"of", "the", "and", "for", "in", "on", "to", "a", "an", "at", "by", "with", "from", "&", "et", "al",
+               "ed", "eds", "n", "nn", "p", "pp", "no", "vol", "v", "see", "also", "cf", "last", "visited", "available",
+               "rev", "art", "ch", "pt", "sess", "reg", "st", "nd", "rd", "th", "d", "s", "e.g", "accord", "but",
+               "generally", "hereinafter", "supra", "id", "ibid", "i.e", "cmt", "app", "u.s", "de", "la", "del",
+               "le", "du", "y", "upon", "under", "as", "or"}
+# What a clause of titles and names needs to be a citation: a section or paragraph sign, a pinpoint, a
+# parenthetical (not a plural's "(s)"), a session law's year, "v.", or "Laws of". Not a list of names
+# and numbers ("Able, ID #12345"), nor a heading with a date ("The May 1, 2019 Meeting").
+CITATION_MARK = re.compile(r"[§¶]|\((?![a-z]{0,2}\))|\bat \*?\d|\b" + YEAR + r"-\d|\bv\. |\bLaws of\b")
+HEADING_MARK = re.compile(r"(?:[IVX]+|[A-Z]|\d{1,2})\.\s")
+CLAUSE_REACH = 400                # a citation clause longer than this is the writer's prose
+OWN_REACH = 3000                  # how far a filing's caption may run, if no citation comes first
+
+
+class Sign:
+    """One authority sign: text[start:end], what kind of sign (name), and whether it's inside a quotation."""
+    __slots__ = ("start", "end", "name", "quoted")
+
+    def __init__(self, start, end, name, quoted):
+        self.start, self.end, self.name, self.quoted = start, end, name, quoted
+
+    def __repr__(self):
+        return f"Sign({self.start}, {self.end}, {self.name!r}{', quoted' if self.quoted else ''})"
+
+
+class Unread:
+    """Text that looks like an authority where no recognized citation is: what the script can't read.
+
+    Built after extraction, from the sentence layer with the citations overlaid (Sentences.overlay). A
+    claim that depends on what comes between two citations (what an Id. refers to, which citation a
+    quotation is from) is safe only when nothing here lies between them; and what's here is counted, so
+    "no finding" can mean "checked", not "never read".
+
+    The signs (SIGNS) are shapes: a pinpoint on a titled phrase or after a parenthetical, a date
+    parenthetical, a web address, "[hereinafter ...]", supra, a docket, a record or transcript cite. One
+    more is general: a citation clause with nothing recognized in it, a clause a signal opens ("See Agency
+    Report 12 (2016).") or one with no verb of its own ("Fla. Dep't of Corr., Annual Report 12 (2016)."),
+    of titles, names, and numbers. A sign that overlaps a recognized citation is the citation's.
+
+    blocks: (start, end) offsets of block quotations, which the sentence layer doesn't hold; a sign in one,
+    or in a quotation, is the quoted writer's (quoted). own: how far into the text the filing's own caption
+    may run, if no citation comes first. Its dockets are the filing's own, not counted there or where they
+    recur (running headers), and its dates and parties aren't citation clauses."""
+
+    def __init__(self, text, sentences, blocks=(), own=OWN_REACH):
+        self.text, self.sentences = text, sentences
+        br = sentences.brackets
+        in_block = _inside(blocks)
+        self.quoted = lambda i: br.quoted(i) or in_block(i)
+        self.cites = sentences.cites
+        self._cite_starts = [a for a, _ in self.cites]
+        self.caption = min([own, len(text)] + self._cite_starts[:1])
+        self._own = {re.sub(r"\D", "", m.group(0)) for m in DOCKET_RX.finditer(text, 0, self.caption)}
+        signs = []
+        for name, rx in SIGNS:
+            for m in rx.finditer(text):
+                if self._keep(name, m):
+                    signs.append(Sign(m.start(), m.end(), name, self.quoted(m.start())))
+        signs += self._clauses()
+        signs.sort(key=lambda s: (s.start, s.end))
+        self.signs = signs
+        self._starts = [s.start for s in signs]
+
+    def _covered(self, a, b):
+        """Does a recognized citation overlap text[a:b]?"""
+        k = bisect.bisect_left(self._cite_starts, b) - 1
+        while k >= 0:
+            x, y = self.cites[k]
+            if y > a:
+                return True
+            if a - x > 2000:
+                return False
+            k -= 1
+        return False
+
+    def _keep(self, name, m):
+        text = self.text
+        if self._covered(m.start(), m.end()):
+            return False
+        if name == "transcript" and m.group(0)[:1].isdigit():
+            if CLOCK.match(text, m.end()) or not re.match(r"\s*(?:[.;,)\]]|\(|$)", text[m.end():m.end() + 3]):
+                return False                                # "at 10:30 a.m.", "a 3:1 grade"
+        if name == "pinpoint" and (m.group("title") in NOT_TITLES or CLOCK.match(text, m.end())):
+            return False                                    # "on Friday, at 3.", "Co. at 3 p.m."
+        if name == "case name" and m.start() < self.caption:
+            return False                                    # the caption's parties
+        if name == "date" and not self._court_words(m.group(0)):
+            return False                                    # "(Served on May 1, 2020)"
+        if name == "docket":
+            if m.start() < self.caption or re.search(r"Bar\.? $", text[max(0, m.start() - 5):m.start()]):
+                return False                                # "Florida Bar No. 123456", "Fla. Bar. No. 123456"
+            if re.sub(r"\D", "", m.group(0)) in self._own:
+                return False                                # the filing's own case number
+        return True
+
+    @staticmethod
+    def _court_words(paren):
+        """Could the words before a date parenthetical's date be a court, an agency, an editor, or an
+        edition ("(M.D. Fla. Sept. 30, 2010)", "(Amy Able ed., 1997)", "(Fla. Dep't of Corr. 2016)")?
+        Not the writer's prose: "(Served on May 1, 2020)", "(the parties' acts prior to May 1, 2020)"."""
+        words = re.findall(r"[A-Za-z][A-Za-z'.\-]*", paren)
+        if any(w.lower() in ("ed.", "eds.") for w in words):
+            return True
+        for w in words:
+            if w.endswith("."):
+                continue
+            if not w[0].isupper() and w.lower() not in TITLE_WORDS:
+                return False                                # a word of the writer's: "actions", "prior"
+            if len(w) >= 5 and w.endswith("ed") and not w.isupper():
+                return False                                # a verb: "Executed", "Served", "Signed"
+        return True
+
+    def _marked(self, a, b):
+        """Has text[a:b] a citation mark (CITATION_MARK)? A parenthetical alone is one only with a number
+        outside it that isn't an identification number: "Annual Report 12 (2016)", not "Count II – Fraud
+        (all Defendants)" or "Able, DC #12345 (May 1, 2020)"."""
+        marks = [m.group(0) for m in CITATION_MARK.finditer(self.text, a, b)]
+        if any(x != "(" for x in marks):
+            return True
+        if not marks:
+            return False
+        t = self.text[a:b]
+        while True:
+            u = re.sub(r"\([^()]*\)", " ", t)
+            if u == t:
+                break
+            t = u
+        return bool(re.search(r"(?<![#\d])(?<!# )\d", t))
+
+    def _clauses(self):
+        """The general sign: citation clauses with nothing recognized in them."""
+        text, sents = self.text, self.sentences
+        br = sents.brackets
+        out = []
+        starts = [0] + sents.bounds
+        for k, s in enumerate(starts):
+            e = sents.ends[k] + 1 if k < len(sents.ends) else len(text)
+            while s < e and text[s].isspace():
+                s += 1
+            if s >= e or s < self.caption or self.quoted(s):
+                continue        # the caption's date and parties
+            cuts = [i for i in sents.semicolons[bisect.bisect_left(sents.semicolons, s):bisect.bisect_left(sents.semicolons, e)]
+                    if (br.open_paren(i) is None or br.open_paren(i) < s)]
+            for a, b in zip([s] + [c + 1 for c in cuts], cuts + [e]):
+                while a < b and text[a] in " (":
+                    a += 1
+                if b - a < 4 or b - a > CLAUSE_REACH or self._covered(a, b):
+                    continue
+                m = SIGNAL_CLAUSE.match(text, a, b)
+                if m:
+                    rest = text[m.end():b]
+                    if re.match(r"[A-Z\d§¶\"“]|https?:|www\.", rest) and not CROSS_REFERENCE.match(rest):
+                        out.append(Sign(a, b, "clause", False))
+                elif self._marked(a, b) and self._verbless(a, b):
+                    out.append(Sign(a, b, "clause", False))
+        return out
+
+    def _verbless(self, s, e):
+        """Is text[s:e] made only of titles, names, numbers, and the few small words a citation holds, with
+        no verb of the writer's (outside parentheses and quotations)? Not a heading: "B. The 2019 Act", "THE
+        COURT ERRED IN APPLYING SECTION 1.01(2)"."""
+        if HEADING_MARK.match(self.text, s):
+            return False
+        t = list(self.text[s:e])
+        for i in range(s, e):
+            if self.quoted(i):
+                t[i - s] = " "
+        t = "".join(t)
+        while True:
+            u = re.sub(r"\([^()]*\)", " ", t)
+            if u == t:
+                break
+            t = u
+        words = re.findall(r"[A-Za-z][A-Za-z'.\-]*", t)
+        if len(words) < 2:
+            return False
+        caps = [w for w in words if len(w.rstrip(".")) >= 3 and w.isupper()]
+        if len(caps) >= 4 and len(caps) * 5 >= len(words) * 3:
+            return False
+        return all(w[0].isupper() or w.endswith(".") or w.lower().rstrip(".") in TITLE_WORDS for w in words)
+
+    # ---- queries
+
+    def attached(self, end, stop):
+        """Where the text attached to a citation ending at offset end stops (not past stop): its pinpoints
+        and footnotes, its parentheticals and the citations in them, a short name, and subsequent history's
+        words, as in "Able, 1 So. 3d 2, 5 n.1 (Fla. 2001) (citing Agency Report, at 3), reh'g denied (May 1,
+        2001) [hereinafter Able]". Signs there are the citation's own: what the script didn't read of it, or
+        an authority in its parenthetical, which an Id. after it doesn't refer to (Indigo Book R15.3.3's note).
+        A sentence end, or any other word, stops it."""
+        text, pairs = self.text, self.sentences.brackets.pairs
+        ends = dict(self.cites)
+        i = end
+        while i < stop:
+            if i in ends and ends[i] > i:
+                i = ends[i]                     # a citation nested in this one's parenthetical or history
+            elif text[i] == "(" and pairs.get(i, stop) < stop:
+                i = pairs[i] + 1
+            else:
+                m = ATTACHED.match(text, i, stop)
+                if not m or m.end() == i:
+                    break
+                i = m.end()
+        return min(i, stop)
+
+    def between(self, end, start):
+        """The signs between a citation ending at offset end and one starting at offset start, outside the
+        first one's attached text (attached) and outside quotations: what an Id. at start can't be read past."""
+        return self.unread(self.attached(end, start), start)
+
+    def unread(self, a, b, quoted=False):
+        """The signs starting in text[a:b]: with quoted, those inside quotations too."""
+        lo, hi = bisect.bisect_left(self._starts, a), bisect.bisect_left(self._starts, b)
+        return [s for s in self.signs[lo:hi] if quoted or not s.quoted]
+
+    def unread_spans(self, quoted=False):
+        """Each unread authority once: the signs in one clause of one sentence, merged (UNCOUNTED aside).
+        Each is a dict:
+        start and end (the first sign's start, the last one's end), signs (their names, in order), and
+        after (the (start, end) of a recognized citation earlier in the clause, whose reading the
+        authority's text continues, as in "Able v. State, No. 1 (Fla. 2020), at 19"; or None)."""
+        sents = self.sentences
+        br = sents.brackets
+        tops = []
+        for i in sents.semicolons:
+            o = br.open_paren(i)
+            if o is None or o < sents.start(i):
+                tops.append(i)
+        groups = {}
+        for s in self.signs:
+            if (s.quoted and not quoted) or s.name in UNCOUNTED:
+                continue
+            k = sents.index(s.start)
+            begin = sents.start(s.start)
+            c = bisect.bisect_left(tops, s.start) - bisect.bisect_left(tops, begin)
+            g = groups.get((k, c))
+            if g is None:
+                lo = tops[bisect.bisect_left(tops, s.start) - 1] + 1 if c else begin
+                groups[(k, c)] = g = {"start": s.start, "end": s.end, "signs": [], "after": None, "_from": lo}
+            g["start"], g["end"] = min(g["start"], s.start), max(g["end"], s.end)
+            if s.name not in g["signs"]:
+                g["signs"].append(s.name)
+        out = []
+        for g in sorted(groups.values(), key=lambda g: g["start"]):
+            lo = g.pop("_from")
+            k = bisect.bisect_left(self._cite_starts, g["start"]) - 1
+            if k >= 0 and self.cites[k][0] >= lo and self.cites[k][1] <= g["start"]:
+                g["after"] = self.cites[k]
+            out.append(g)
+        return out

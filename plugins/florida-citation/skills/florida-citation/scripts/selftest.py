@@ -123,7 +123,7 @@ OPINIONS = [
     ("4D2025-0167", "https://flcourts-media.flcourts.gov/content/download/2496006/opinion/Opinion_2025-0167.pdf",
      "d21d3432bbbeaf16", 70, ()),
     ("1D2025-0988", "https://flcourts-media.flcourts.gov/content/download/2495985/opinion/Opinion_2025-0988.pdf",
-     "f04797a44e71d573", 18, (("ellipsis-form", "..."),)),
+     "f04797a44e71d573", 18, (("ellipsis-form", "..."), ("f-fla-period", "Fla Stat."))),
 ]
 
 
