@@ -1338,8 +1338,8 @@ def classify_court(ct):
         return None
     if re.fullmatch(r"Fla\.?(?: Sup(?:reme|\.)? ?Ct\.?)?", ct):
         return {"id": "SC", "family": "florida", "sub": "a"}
-    m = re.fullmatch(r"(?:Fla\.? )?(1st|2d|2nd|3d|3rd|4th|5th|6th) ?(?:DCA|D\. ?C\. ?A\.)", ct)
-    if m:                                  # the space may be missing: "4thDCA" (b-dca-glued)
+    m = re.fullmatch(r"(?:Fla\.? ?)?(1st|2d|2nd|3d|3rd|4th|5th|6th) ?(?:DCA|D\. ?C\. ?A\.)", ct)
+    if m:                                  # a space may be missing: "4thDCA" (b-dca-glued), "Fla.4th" (b-fla-glued)
         return {"id": DCA_ORDINALS[m.group(1)], "family": "florida", "sub": "b"}
     m = re.fullmatch(r"Fla\. (1st|2d|2nd|3d|3rd|4th|5th|6th)", ct)
     if m:                                  # "(Fla. 2d 2020)": DCA left out (b-dca-missing)
@@ -1525,7 +1525,7 @@ CONSTITUTIONS = [
     ("hybrid", re.compile(r"\b(?P<what>[Aa]rticle) " + ARTICLE_NUM + r",? (?P<sign>§§?) ?" + CONST_SEC + r",? of the (?P<which>Florida|United States|U\.S\.) Constitution")),
     ("abbreviated", re.compile(r"\b(?P<what>[Aa]mend(?:\.|ment)) (?P<num>[IVXL]+)(?:, (?:§|[Ss]ec\.) ?(?P<sec>\d+))?, (?P<which>U\.S\. Const\.)", re.I)),
     ("bluebook-order", re.compile(r"\b(?P<which>Fla\.|U\.S\.) Const\. (?P<what>art\.|amend\.) (?P<num>[IVXL]+|(?<=art\. )\d{1,2}(?!\d|\.\d))"
-                                  r"(?:, (?P<sign>§§?) ?(?P<sec>\d+[\w()]*))?(?:, cl\. (?P<cl>\d+))?", re.I)),
+                                  r"(?:,? (?P<sign>§§?) ?(?P<sec>\d+[\w()]*))?(?:, cl\. (?P<cl>\d+))?", re.I)),
     ("sentence", re.compile(r"\b[Aa]rticle (?P<num>[IVXL]+)(?:, [Ss]ections? (?P<sec>\d+[\w()]*))?,? of the (?P<which>Florida|United States|U\.S\.) Constitution")),
 ]
 ADMIN_CODE = [
@@ -1587,7 +1587,8 @@ GENERIC_REPORTER = re.compile(
 OFFICIAL_BEFORE = re.compile(r"(?<![\w.,§])\d{1,4} (?P<rep>" + REP_WORD + r"(?: " + REP_WORD + r"){0,3}) "
                              r"\d{1,5}(?:, \d+(?:[-–]\d+)?)*, $")
 
-PIN = re.compile(r"(?:,|,? )(?:at )?(\*{0,2}\d+(?:[-–—]\*{0,2}\d+)?(?: nn?\. ?\d+(?:[-–]\d+)?)?(?: & nn?\. ?\d+)?)(?!\d)")
+# Not an ordinal: "1 So. 3d 100 1st DCA 2009)" lost its "(Fla." and has no pinpoint.
+PIN = re.compile(r"(?:,|,? )(?:at )?(\*{0,2}\d+(?:[-–—]\*{0,2}\d+)?(?: nn?\. ?\d+(?:[-–]\d+)?)?(?: & nn?\. ?\d+)?)(?!\d)(?!(?:st|nd|rd|th|d)\b)")
 PAREN = re.compile(r" ?\(((?:[^()]|\([^()]*\))*)\)")
 EXTRA_PAREN = re.compile(r" ?\((?:Table|table|mem\.?|unpublished table decision|per curiam)\)")
 # A docket number after "No.": any run with a digit, to the comma. OCR can put a stray symbol inside
@@ -1596,16 +1597,25 @@ DOCKET = r"[A-Za-z0-9][^\s,;()\[\]\"“”]*\d[^\s,;()\[\]\"“”]*"
 # A blank for a cite not yet assigned: "___ So. 3d ___", "--- So. 3d ---", "— U.S. —".
 BLANK = r"(?:_{2,}|-{2,}|[—–]{1,3})"
 # A docket number written without "No.": a Florida appellate number (SC2010-1544), or a federal one
-# (14-12345-CIV, 1:21-cv-45-XY-ABC, CV 2:18-00123-AB-C, 3:12-cv-100-AB/CD, 2019-CA-001234).
+# (14-12345-CIV, 1:21-cv-45-XY-ABC, CV 2:18-00123-AB-C, 3:12-cv-100-AB/CD, 2019-CA-001234), a district's
+# without its colon (605CV-210-ORL-22ABC), or a court of appeals' (17-12345), which only reads as one right
+# before the Westlaw or slip cite it numbers (DOCKET_BEFORE's anchor).
 BARE_DOCKET = (r"(?:SC|[1-6]D)\d{2,4}-\d+"
                r"|(?:C[VRA] )?\d{1,2}:\d{2}-?[A-Za-z]{2,3}-\d{1,6}(?:-[\w/]+)*"
                r"|(?:C[VRA] )?\d{1,2}:\d{2}-\d{3,6}(?:-[\w/]+)*"
+               r"|\d{3}C[VRA]-\d{1,6}(?:-[\w/]+)*"
                r"|\d{1,2}-\d{3,6}-[A-Z]{2,5}(?:-[\w/]+)*"
-               r"|\d{2,4}-[A-Z]{2}-\d{3,7}(?:-[\w/]+)*")
+               r"|\d{2,4}-[A-Z]{2}-\d{3,7}(?:-[\w/]+)*"
+               r"|\d{2}-\d{4,6}")
+# The word before "No." labels the number and belongs to it, not to the case name: "Case No.", and an
+# agency's "Docket No." and "Order No." (9.800(d)): "In re Able, Docket No. 20200001-EI, Order No. PSC-..."
+DOCKET_LABEL = r"(?:(?:Case|Docket|(?:Final |Amended )?Order) )?"
 DOCKET_BEFORE = re.compile(
-    r"(?:\b(?:Case )?Nos?\.\s?(?P<d>(?:C[VRA] )?" + DOCKET + r"(?:(?:, | & | and )" + DOCKET + r")*)"
+    r"(?:\b" + DOCKET_LABEL + r"Nos?\.\s?(?P<d>(?:C[VRA] )?" + DOCKET + r"(?:(?:, | & | and )" + DOCKET + r")*)"
     r"|(?<![\w\-])(?P<bare>" + BARE_DOCKET + r")),? $")
-SLIP = re.compile(r"\b(?:Case )?Nos?\.\s?(?P<d>(?:C[VRA] )?" + DOCKET + r"(?:(?:, | & | and )" + DOCKET + r")*)(?:, (?:slip op\. at |p\. )\d+)?(?= ?\()")
+# An earlier labeled number before the one the citation starts at: the name ends before it.
+DOCKET_TAIL = re.compile(r"(?:, (?:Case |Docket )?Nos?\.\s?" + DOCKET + r")+$")
+SLIP = re.compile(r"\b" + DOCKET_LABEL + r"Nos?\.\s?(?P<d>(?:C[VRA] )?" + DOCKET + r"(?:(?:, | & | and )" + DOCKET + r")*)(?:, (?:slip op\. at |p\. )\d+)?(?= ?\()")
 FL_DOCKET = re.compile(r"(?<![\w\-])(?:SC|[1-6]D)-?(?:\d{2}|\d{4})-\d+(?![\w\-])")
 
 # Short forms (Indigo Book R6.2, R15). "Id" without its period is caught only where a citation's would
@@ -2018,6 +2028,12 @@ class Engine:
         gap = 2 if w.endswith(", ") else 1 if re.search(r"[A-Za-z.'] $", w) else 0
         if gap:
             head = w[:-gap]
+            trim = 0
+            if c.get("docket") and c["start"] == c["docket"].get("start", c["start"]):
+                t = DOCKET_TAIL.search(head)          # "In re Able, Docket No. 1-EI, [Order No. PSC-1]"
+                if t:
+                    trim = len(head) - t.start()
+                    head = head[:t.start()]
             # A name lies inside one sentence: the one holding the comma before the cite.
             begins = doc.periods.sentence_start(c["start"] - gap, plain=True) - w0
             v = None
@@ -2060,7 +2076,7 @@ class Engine:
                                 break
                             name = name[m.end():]
                         c["case_name"] = name
-                        name_start = c["start"] - gap - len(name)
+                        name_start = c["start"] - gap - trim - len(name)
             elif inre:
                 rest = head[inre.start():]
                 if (len(rest) <= 140 and not _bad_name(rest, doc.periods.abbr) and begins <= inre.start()
@@ -3520,7 +3536,8 @@ def link_short_forms(doc, cites):
             between = sum(1 for t in top if e["start"] < t["start"] < c["start"] and t["kind"] not in SHORT_KINDS)
             if ((not doc.ff or _page(e) == _page(c)) and between <= REPEAT_WINDOW
                     and doc.stream(e["start"]) == doc.stream(c["start"])        # text and a footnote are apart
-                    and not any(e["start"] < b < c["start"] for b in breaks)):
+                    and not any(e["start"] < b < c["start"] for b in breaks)
+                    and not _heading_between(doc, e["end"], c["start"])):
                 links["repeats"].append({"cite": c, "earlier": e, "between": between})
         if c["nested_in"] is None:         # one cited inside another's parenthetical may be given in full later
             seen[k] = c
@@ -3552,6 +3569,43 @@ def _in_heading(doc, c):
     words = re.findall(r"[A-Za-z][A-Za-z'’.\-]*", lead[mark.end():])
     return (len(words) >= 2 and all(w[0].isupper() or w.lower() in fs.TITLE_WORDS for w in words)
             and any(w.lower().rstrip(".") not in fs.TITLE_WORDS for w in words))
+
+
+# A heading the reader ran into the paragraph under it, at a sentence's start: capitals, six letters or more in
+# all (not an acronym, "FPL"), then a capitalized word of the prose ("ARGUMENT The standard of review ...").
+HEADING_RUN = re.compile(r"(?:(?:[IVX]+|[A-Z])\.\s+)?((?:[A-Z][A-Z'’\-]*\s+){0,9}[A-Z][A-Z'’\-]+)\s+(?=[A-Z][a-z])")
+
+
+def _heading_between(doc, a, b):
+    """Does a heading come between offsets a and b: a sentence starting between them that is a heading, or
+    starts with one the reader ran into the paragraph under it? The same tests as _in_heading, at each
+    sentence's start."""
+    norm = doc.norm
+    for s0 in doc.sentences.bounds:
+        if s0 <= a:
+            continue
+        if s0 >= b:
+            break
+        s = s0
+        while s < b and norm[s].isspace():
+            s += 1
+        e = doc.sentences.end(s)
+        text = norm[s:min(b, e + 1 if e is not None else b)]
+        if re.fullmatch(r"(?:[IVX]+|[A-Z])\.", text.strip()):
+            return True                    # a heading's mark the sentence layer read as a sentence ("B.")
+        m = HEADING_RUN.match(text)
+        if m and len(re.sub(r"[^A-Z]", "", m.group(1))) >= 6:
+            return True
+        words = re.findall(r"[A-Za-z][A-Za-z'’.\-]*", text)
+        if fs.mostly_capitals(words):
+            return True
+        mark = fs.HEADING_MARK.match(text)
+        if mark:
+            words = re.findall(r"[A-Za-z][A-Za-z'’.\-]*", text[mark.end():])
+            if (len(words) >= 2 and all(w[0].isupper() or w.lower() in fs.TITLE_WORDS for w in words)
+                    and any(w.lower().rstrip(".") not in fs.TITLE_WORDS for w in words)):
+                return True
+    return False
 
 
 def _id_case_first(x, cites):

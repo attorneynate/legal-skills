@@ -402,6 +402,11 @@
         "rule": "9.800(n)(1)"
       },
       {
+        "wrong": "F. Supp",
+        "right": "F. Supp.",
+        "rule": "9.800(n)(1)"
+      },
+      {
         "wrong": "F.Supp.2d",
         "right": "F. Supp. 2d",
         "rule": "9.800(n)(1)"

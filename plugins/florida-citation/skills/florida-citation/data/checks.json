@@ -110,14 +110,19 @@
      "message": "A space separates the district from DCA: (Fla. 4th DCA 2010).",
      "examples": {"match": ["(Fla. 4thDCA 2010)", "60 So. 3d 100 (Fla. 2dDCA 2010)", "(Fla. 4thDCA June 12, 2014)"], "no_match": ["(Fla. 4th DCA 2010)", "the 4thDCA's ruling", "B. The 2dDCA Erred"]}},
 
+    {"id": "b-fla-glued", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern", "summarize": true,
+     "pattern": "\\((Fla\\.)((?:1st|2d|2nd|3d|3rd|4th|5th|6th) ?(?:DCA|D\\. ?C\\. ?A\\.))(?= (?:[A-Z][a-z]{2,8}\\.? \\d{1,2}, )?(?:1[89]|20)\\d\\d\\))", "fix": "(\\1 \\2",
+     "message": "A space follows Fla. in a district court's parenthetical: (Fla. 4th DCA 2010).",
+     "examples": {"match": ["Doe v. Roe, 500 So. 2d 100, 102 (Fla.1st DCA 1990)", "(Fla.4th DCA 2005)", "(Fla.2d DCA July 1, 2010)"], "no_match": ["(Fla. 1st DCA 1990)", "(Fla.1990)", "the Fla.4th DCA rule of 1990)"]}},
+
     {"id": "b-west-district", "authority": "9.800(b)(1)", "severity": "error", "kind": "logic", "logic": "west_dca",
      "message": "Name the district court as the rule does: (Fla. 4th DCA 2012), not Westlaw's (Fla. App. 4th Dist. 2012) or (Fla.App. 4 Dist. 2012).",
      "examples": {"match": ["Doe v. Roe, 100 So. 3d 1 (Fla. App. 4th Dist. 2012).", "Doe v. Roe, 500 So. 2d 1 (Fla.App. 3 Dist. 1988)."], "no_match": ["Doe v. Roe, 100 So. 3d 1 (Fla. 4th DCA 2012).", "Doe v. Roe, 500 So. 2d 1 (Fla. Dist. Ct. App. 1988)."]}},
 
     {"id": "f-name-first", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\bFlorida Statutes?,? ?(?:[Ss]ection|§) ?(\\d+\\.\\d+(?:\\([\\w]+\\))*)", "fix": "section \\1, Florida Statutes",
+     "pattern": "\\bFlorida Statutes?,? ?(?:[Ss]ection|§) ?(\\d+\\.\\d+(?:\\([\\w]+\\))*)(?:,? Florida Statutes\\b)?", "fix": "section \\1, Florida Statutes",
      "message": "Florida's form puts the section first: section 48.031, Florida Statutes, in a sentence; § 48.031, Fla. Stat., standing alone.",
-     "examples": {"match": ["under Florida Statute Section 48.031, service was", "as Florida Statute § 48.031(1) provides", "as Florida Statute§ 48.031(1) provides"], "no_match": ["section 48.031, Florida Statutes", "the Florida Statutes provide"]}},
+     "examples": {"match": ["under Florida Statute Section 48.031, service was", "as Florida Statute § 48.031(1) provides", "as Florida Statute§ 48.031(1) provides", "service was made under Florida Statutes Section 48.031, Florida Statutes before the deadline"], "no_match": ["section 48.031, Florida Statutes", "the Florida Statutes provide"]}},
 
     {"id": "court-unreadable", "authority": "9.800(b)(1)", "severity": "check", "kind": "logic", "logic": "court_unreadable",
      "message": "The district in the parenthetical isn't one Rule 9.800 names, or isn't where the rule puts it: a typo, or an OCR misreading ('Ist' for '1st', 'Sth' for '5th').",
@@ -175,9 +180,9 @@
      "examples": {"match": ["Fla. Const. art. V, § 3(b)(3)."], "no_match": ["Art. V, § 3(b)(3), Fla. Const."]}},
 
     {"id": "e-name-first", "authority": "9.800(e)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\bFlorida Constitution,? ?[Aa]rt(?:icle|\\.) ?([IVX]+),? ?(?:§|[Ss]ec(?:tion|\\.)) ?(\\d+(?:\\(\\w+\\))*)(?!(?:\\(\\w+\\))*,? Fla\\. Const)", "fix": "article \\1, section \\2 of the Florida Constitution",
+     "pattern": "\\bFlorida Constitution,? ?[Aa]rt(?:icle|\\.) ?([IVX]+),? ?(?:§|[Ss]ec(?:tion|\\.)) ?(\\d+(?:\\(\\w+\\))*)(?!(?:\\(\\w+\\))*,? (?:Fla\\. Const|Florida Constitution))", "fix": "article \\1, section \\2 of the Florida Constitution",
      "message": "Florida's form puts the article and section first: article IV, section 8 of the Florida Constitution in a sentence; Art. IV, § 8, Fla. Const., standing alone.",
-     "examples": {"match": ["falls under the Florida Constitution Article IV, § 8.", "under Florida Constitution, Art. I, Section 9(a)"], "no_match": ["article IV, section 8 of the Florida Constitution", "Art. IV, § 8, Fla. Const.", "Florida Constitution Art. IV, § 8, Fla. Const......12"]}},
+     "examples": {"match": ["falls under the Florida Constitution Article IV, § 8.", "under Florida Constitution, Art. I, Section 9(a)"], "no_match": ["article IV, section 8 of the Florida Constitution", "Art. IV, § 8, Fla. Const.", "Florida Constitution Art. IV, § 8, Fla. Const......12", "Florida Constitution Art. IV, Sec. 3, Florida Constitution ......7"]}},
 
     {"id": "e-arabic-article", "authority": "9.800(e)(1), (o)(1)", "severity": "error", "kind": "logic", "logic": "arabic_article",
      "message": "Constitutional articles take roman numerals, section first: Art. I, § 16(b), Fla. Const.",
@@ -383,9 +388,9 @@
      "examples": {"match": ["594 So. 2d 292,293 (Fla. 1992)", "700 F. App'x 100,104 (11th Cir. 2017)", "300 N.E.2d 5,7 (Mass. 1973)"], "no_match": ["594 So. 2d 292, 293 (Fla. 1992)", "§ 48.031,2"]}},
 
     {"id": "year-space", "summarize": true, "authority": "9.800(a)(1), (b)(1), (c), (l)(1), (m)(1), (n)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "(\\((?:[^()]{0,60}? )?(?:[A-Z][A-Za-z.]*\\.|DCA))((?:1[6-9]|20)\\d\\d\\))", "fix": "\\1 \\2",
+     "pattern": "(?<=\\d\\s)(\\((?:[^()]{0,60}? )?(?:[A-Z][A-Za-z.]*\\.|DCA))((?:1[6-9]|20)\\d\\d\\))", "fix": "\\1 \\2",
      "message": "A space comes before the year in a court's date parenthetical: (Fla. 1992), (11th Cir. 2012). In OCR'd text, compare the original; the space may have been lost in scanning.",
-     "examples": {"match": ["Doe v. Roe, 594 So. 2d 292 (Fla.1992).", "Doe v. Roe, 700 F.3d 100 (11th Cir.2012).", "Doe v. Roe, 500 F. Supp. 2d 100 (S.D. Fla.2007).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA1983)."], "no_match": ["Doe v. Roe, 594 So. 2d 292 (Fla. 1992).", "Doe v. Roe, 40 So. 100 (1928).", "Doe v. Roe, 815 So. 2d 100 (Fla. 3d DCA Mar. 6,2002).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA 1983)."]}},
+     "examples": {"match": ["Doe v. Roe, 594 So. 2d 292 (Fla.1992).", "Doe v. Roe, 700 F.3d 100 (11th Cir.2012).", "Doe v. Roe, 500 F. Supp. 2d 100 (S.D. Fla.2007).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA1983)."], "no_match": ["Doe v. Roe, 594 So. 2d 292 (Fla. 1992).", "Doe v. Roe, 40 So. 100 (1928).", "Doe v. Roe, 815 So. 2d 100 (Fla. 3d DCA Mar. 6,2002).", "Doe v. Roe, 430 So. 2d 100 (Fla. 1st DCA 1983).", "The defense was pleaded in the answer. (R.1850).", "Counsel conceded the point. (R.1850); see also (R. 1702).", "See also (T.1999)."]}},
 
     {"id": "case-name-comma", "authority": "9.800", "severity": "error", "kind": "logic", "logic": "name_comma",
      "message": "A comma follows the case name, before the volume: Fenelon v. State, 594 So. 2d 292 (Fla. 1992).",

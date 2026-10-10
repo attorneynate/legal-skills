@@ -49,7 +49,7 @@ What it checks, beyond abbreviations and spacing:
 - **Westlaw and LEXIS cites** without the docket number the rule pairs with them, or with that number missing its `No.`
 - **Spelled-out forms:** "§ 48.031, Fla. Stat." used as part of a sentence, where the rule wants "section 48.031, Florida Statutes," and "Florida Constitution Article IV, § 8" for "article IV, section 8 of the Florida Constitution."
 - **Pinpoints and dates in full citations:** `594 So. 2d 292 at 293` for `292, 293`; a case name with no comma before the volume (`Doe v. Roe, Inc. 594 So. 2d 292`); `(Fla.1992)` with no space; a month and day on a case published in a reporter, where the year alone belongs (a date that doesn't fit can mean a different ruling in the same case).
-- **Court parentheticals in a database's style:** Westlaw's `(Fla. App. 4th Dist. 2012)` for `(Fla. 4th DCA 2012)`, and `4thDCA` run together.
+- **Court parentheticals in a database's style:** Westlaw's `(Fla. App. 4th Dist. 2012)` for `(Fla. 4th DCA 2012)`, and `4thDCA` or `Fla.4th` run together.
 - **Punctuation that hides where a citation ends** (to check): parentheses that don't pair, a quotation mark that opens and never closes before a citation, and a statute subsection that can't be read, for which no fix is offered rather than one that drops it.
 - **Quotations without a page** (to check): a quotation from a case whose citation gives no pinpoint, directly, through Id., or through a short form. A defined term in a parenthetical, `(the "Agreement")`, isn't taken for a quotation.
 - **Signals and ellipses:** a signal capitalized after a semicolon inside a citation sentence (`; See also`), and an ellipsis in the document's own quotation that isn't three spaced periods (`...` or `…` for `. . .`).
@@ -63,7 +63,7 @@ What it checks, beyond abbreviations and spacing:
   - a short form missing `at` (`Fenelon, 594 So. 2d 294.` after the full citation);
   - a pinpoint before the case's first page;
   - supra used for a case;
-  - a full citation repeated on the same page where a short form would do (one in a section heading doesn't count).
+  - a full citation repeated on the same page where a short form would do (one in a section heading, or after a new heading, doesn't count).
 - **Case-name typeface** (9.800(q)) in Word and Markdown files, where italics survive.
 
 ### Reviews the other side's filing
@@ -101,7 +101,7 @@ The judgment stays with the agent and the arithmetic with the script. The report
   - a quotation's source across such an authority: the quotation is listed with no citation rather than tied to the wrong one;
   - pinpoint checks on a citation whose page may come after what it read (`..., 2020 WL 1234567 (M.D. Fla. Mar. 1, 2020), at 19`);
   - "never cited in full" for a short form whose volume and reporter turn up in a passage it didn't read (a table's cells, for instance), where the full citation may be.
-- **Record citations are checked only for form.** `(R. 45)` and appendix cites follow each court's own practice, so the script reports only the paragraph-sign and Id. forms above, as things to check, and never whether a record cite points where it should.
+- **Record citations are checked only for form.** `(R. 45)` and appendix cites follow each court's own practice, so the script reports only the paragraph-sign and Id. forms above, as things to check, and never whether a record cite points where it should. A record cite is never read as a court and year: `(R.1850)` is a page of the record, not a parenthetical missing its space.
 - **The Bluebook system is checked through the Indigo Book,** which tracks an earlier Bluebook edition. The 22nd edition's changes are listed for the agent, but the script's short-form checks follow the Indigo Book's rules. The skill quotes no Bluebook text.
 - **It doesn't edit your file.** It reports locations and fixes; you or your agent make the changes.
 - **OCR is a separate step.** A scanned PDF stops with a message that it needs OCR, with the OCRmyPDF command to run (see Setup). OCR misreads some characters (`Id.` as `ld.`, `5th` as `Sth`, a dropped hyphen in a page range), and the script doesn't guess around them, so read an OCR'd finding's pinpoint against the page.
