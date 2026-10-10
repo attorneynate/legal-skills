@@ -46,11 +46,13 @@ class Source:
     for formats where "line" means something else. blocks: (start, end) ranges of block quotations
     the format's layout shows (a PDF's indentation, a .docx paragraph's indents or style), or None
     when it shows none; then the text alone decides. footnote_starts: offsets where a page's
-    footnotes begin, as its layout shows them, or None; then the text alone decides.
+    footnotes begin, as its layout shows them, or None; then the text alone decides. hanging: the
+    names a table of authorities' hanging entries put on a line of their own, the citation indented
+    below (layout_hanging), or None; then the text's own line breaks show them.
     """
 
     def __init__(self, text, name="<text>", kind="txt", emphasis=None, line_labels=None, blocks=None,
-                 footnote_starts=None):
+                 footnote_starts=None, hanging=None):
         self.text = text.replace("\r\n", "\n").replace("\r", "\n")
         self.name = name
         self.kind = kind
@@ -58,6 +60,7 @@ class Source:
         self.line_labels = line_labels
         self.blocks = blocks
         self.footnote_starts = footnote_starts
+        self.hanging = hanging
         self.cut = None                  # (last page kept, pages in all) after first_pages
 
 
@@ -79,7 +82,7 @@ def first_pages(source, n):
     cut = Source(source.text[:end], source.name, source.kind, emphasis=source.emphasis,
                  blocks=[b for b in source.blocks if b[0] < end] if source.blocks is not None else None,
                  footnote_starts=[f for f in source.footnote_starts if f < end]
-                 if source.footnote_starts is not None else None)
+                 if source.footnote_starts is not None else None, hanging=source.hanging)
     cut.cut = (n, total)
     return cut
 
@@ -221,7 +224,7 @@ def read_pdf(path):
                  f'  ocrmypdf --output-type pdf --deskew "{path}" "{ocr}"\n'
                  f'then check "{ocr}".\n' + NO_OCRMYPDF)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    blocks = feet = None
+    blocks = feet = hanging = None
     try:                               # a second pass, only to see layout; citations are read above
         r = _pdftotext(exe, path, layout=True, nodiag=nodiag)
         if r.returncode == 0:
@@ -229,9 +232,30 @@ def read_pdf(path):
             text = line_end_hyphens(text, layout)
             blocks = layout_blocks(text, layout)
             feet = layout_footnotes(text, layout)
+            hanging = layout_hanging(layout)
     except (subprocess.TimeoutExpired, OSError):
         pass
-    return Source(text, str(path), "pdf", blocks=blocks, footnote_starts=feet)
+    return Source(text, str(path), "pdf", blocks=blocks, footnote_starts=feet, hanging=hanging)
+
+
+# A table of authorities' hanging entry: a case's name on a line of its own, then its citation, indented further,
+# ending in leaders and pages ("Able v. Baker" / "     1 So. 3d 2 (Fla. 2010)........4").
+HANGING_CITE = re.compile(r"\d{1,4} \S.*?(?:[.…·_][.…·_ ]{2,}|…|\t| {3,})\s*(?:\d+(?:\s*[,&\-–]\s*\d+)*|passim)")
+
+
+def layout_hanging(layout):
+    """The names on a line of their own in a table of authorities' hanging entries, as -layout shows them,
+    whitespace collapsed. The reading order may join the name to its citation on one line; the line break
+    stands for the comma between them (lc_name_comma)."""
+    out = set()
+    lines = [s.replace("\f", "").expandtabs() for s in layout.split("\n")]
+    for a, b in zip(lines, lines[1:]):
+        if not a.strip() or not b.strip():
+            continue
+        ia, ib = len(a) - len(a.lstrip()), len(b) - len(b.lstrip())
+        if ib > ia and HANGING_CITE.fullmatch(b.strip()) and not LAYOUT_LEADER.search(a):
+            out.add(" ".join(a.split()))
+    return out
 
 
 # A hyphen at a line's end between digits, as -layout keeps it: "Rule 4-" / "1.5(b)", "466, 476-" / "77". The
@@ -342,8 +366,9 @@ def _paired_pages(text, layout):
     return rpages, lpages
 
 
-# A footnote's first line: "2 See ...", "2.   See ...", or Poppler's "2See ..." (but not "60(b)").
-LAYOUT_FOOTNOTE = re.compile(r"(\d{1,3})(?:\.?\s+|(?=[A-Z]))([A-Z\"'“‘(\[§].*)")
+# A footnote's first line: "2 See ...", "2.   See ...", Poppler's "2See ..." (but not "60(b)"), or "2/See ..."
+# (but not a record cite wrapped after a slash, "15/R1880").
+LAYOUT_FOOTNOTE = re.compile(r"(\d{1,3})(?:\.?\s+|/\s*(?=[\"'“‘(]|[A-Z][^\s\d]*\s)|(?=[A-Z]))([A-Z\"'“‘(\[§].*)")
 FOOTNOTE_OPENS = re.compile(r"[A-Z\"'“‘(\[§]")
 FOOTNOTE_NEEDLE = 40             # characters of a footnote's opening matched in reading-order text
 LINE_NUMBERED = 0.3              # a page with this share of its lines opening with a number is numbered
@@ -353,9 +378,10 @@ def footnote_marker(n, text):
     """Does footnote number n appear in text as a marker: glued to a word or punctuation
     ("ordinances.2 See"), or one space after a period or a closing mark, where Poppler sets a
     superscript ("Rule 1.530. 6 See", "relief.” 4 The"), or glued before a dash, where the marker goes
-    ("common law11--and", "law11—and")? A number after a word or a comma and a space is a count or a
-    pinpoint ("count 2 is", "at 10, 11")."""
-    return bool(re.search(r"(?:[A-Za-z.,;:)\]\"'”’]|[.;)\]\"'”’] )" + n + r"(?=\s|$)"
+    ("common law11--and", "law11—and")? A marker may carry a slash ("law.7/ The"), as footnotes
+    numbered "7/" do. A number after a word or a comma and a space is a count or a pinpoint ("count 2
+    is", "at 10, 11")."""
+    return bool(re.search(r"(?:[A-Za-z.,;:)\]\"'”’]|[.;)\]\"'”’] )" + n + r"/?(?=\s|$)"
                           r"|[A-Za-z.,;:)\]\"'”’]" + n + r"(?=--|[—–])", text))
 
 
@@ -383,7 +409,8 @@ def footnote_line(lines, k, expected=None, at_margin=False):
         return False
     n = int(m.group(1))
     if n > 1:
-        dot = r"\.\s*" if lines[k][len(m.group(1))] == "." else r"(?!\.)\s*"
+        sep = lines[k][len(m.group(1))]
+        dot = r"\.\s*" if sep == "." else r"/\s*" if sep == "/" else r"(?!\.)\s*"
         prev = re.compile(str(n - 1) + dot + FOOTNOTE_OPENS.pattern)
         if any(prev.match(s) for s in lines[:k]):
             return False
@@ -413,30 +440,37 @@ def layout_footnotes(text, layout):
     where Xpdf keeps "1.530.6 See" and "6 By way of ..."; in -layout, both put the number at the start
     of the footnote's first line, or on a line of its own beside it. A footnote starts at a line,
     below the page's first, that footnote_line accepts. Its opening characters, without the number,
-    are then found in the reading-order page, ignoring whitespace. None when the page counts differ."""
+    are then found in the reading-order page, ignoring whitespace. None when the page counts differ.
+
+    A footnote that runs over from the page before (its last line ends without a sentence's end)
+    resumes, unnumbered, above the page's first numbered one: there the footnotes begin at the
+    single-spaced lines right above it, when a blank line sets them off from a double-spaced body
+    (_footnote_continuation)."""
     paired = _paired_pages(text, layout)
     if paired is None:
         return None
     rpages, lpages = paired
-    out, offset, last = [], 0, 0
+    out, offset, last, runs_over = [], 0, 0, False
     for rp, lp in zip(rpages, lpages):
-        rows = []
+        rows, gap = [], False          # (indent, text, a blank line above it)
         for line in lp.split("\n"):
             line = line.expandtabs().rstrip()
             if line.strip():
-                rows.append((len(line) - len(line.lstrip()), line.strip()))
+                rows.append((len(line) - len(line.lstrip()), line.strip(), gap))
+            gap = not line.strip()
         # Poppler can set a footnote's number on a line of its own, above or below the footnote's
         # first line; rejoin them. (A page number is the page's last line.)
         for j in range(len(rows) - 2, -1, -1):
-            if not re.fullmatch(r"\d{1,3}\.?", rows[j][1]):
+            if not re.fullmatch(r"\d{1,3}[./]?", rows[j][1]):
                 continue
             if FOOTNOTE_OPENS.match(rows[j + 1][1]):
-                rows[j:j + 2] = [(rows[j][0], rows[j][1] + " " + rows[j + 1][1])]
+                rows[j:j + 2] = [(rows[j][0], rows[j][1] + " " + rows[j + 1][1], rows[j][2])]
             elif j and FOOTNOTE_OPENS.match(rows[j - 1][1]) and not LAYOUT_FOOTNOTE.fullmatch(rows[j - 1][1]):
-                rows[j - 1:j + 1] = [(rows[j - 1][0], rows[j][1] + " " + rows[j - 1][1])]
-        lines = [s for _, s in rows]
-        wide = [ind for ind, s in rows if len(s.replace(" ", "")) >= LAYOUT_MIN_CHARS]
+                rows[j - 1:j + 1] = [(rows[j - 1][0], rows[j][1] + " " + rows[j - 1][1], rows[j - 1][2])]
+        lines = [r[1] for r in rows]
+        wide = [r[0] for r in rows if len(r[1].replace(" ", "")) >= LAYOUT_MIN_CHARS]
         margin = _left_margin(wide) if wide else 0
+        over, runs_over = runs_over, False
         for k in range(1, len(lines)):
             # The next line back at the margin, or none: the page's end, or the next footnote.
             m = LAYOUT_FOOTNOTE.fullmatch(lines[k])
@@ -446,6 +480,8 @@ def layout_footnotes(text, layout):
             if not footnote_line(lines, k, last + 1, at_margin):
                 continue
             last = last_footnote(lines, k)
+            tail = [s for s in lines[k:] if not PAGE_NUMBER.match(s)]
+            runs_over = bool(tail) and not re.search(r"[.?!:][\"'”’)\]]*$", tail[-1])
             m = LAYOUT_FOOTNOTE.fullmatch(lines[k])
             own = [m.group(2)]                     # the footnote's own text: its number may move too
             for s in lines[k + 1:k + 3]:
@@ -454,12 +490,32 @@ def layout_footnotes(text, layout):
                 own.append(s)
             needle = re.sub(r"\s", "", " ".join(own))[:FOOTNOTE_NEEDLE]
             keep = [j for j, ch in enumerate(rp) if not ch.isspace()]
-            at = "".join(rp[j] for j in keep).rfind(needle)
+            flat = "".join(rp[j] for j in keep)
+            at = flat.rfind(needle)
             if at >= 0:
+                c = _footnote_continuation(rows, k) if over else k
+                if c < k:                          # the run-over footnote's rest, found before this one
+                    cn = re.sub(r"\s", "", " ".join(lines[c:min(c + 3, k)]))[:FOOTNOTE_NEEDLE]
+                    ca = flat.rfind(cn, 0, at)
+                    at = ca if ca >= 0 else at
                 out.append(offset + keep[at])
                 break
         offset += len(rp) + 1
     return out
+
+
+def _footnote_continuation(rows, k):
+    """Where a footnote run over from the page before resumes, above the page's first numbered footnote at
+    row k of the page's rows (indent, text, a blank line above): the rows right above it with no blank
+    line between, up to one that has a blank line above it, when the row above that one has one too
+    (a double-spaced body, whose last line it is). k when no such rows are there: -layout drops blank
+    lines too often to set a single-spaced body apart."""
+    j = k
+    while j > 0 and not rows[j][2]:
+        j -= 1
+    if j == k or j < 2 or not rows[j][2] or not rows[j - 1][2]:
+        return k
+    return j
 
 
 def _left_margin(indents):
@@ -1002,7 +1058,7 @@ class Doc:
             s = starts[j]
             for k, (a, b) in enumerate(lines):
                 if a <= s <= b:
-                    if raw[a:s].strip() and not re.fullmatch(r"\s*\d{1,3}\.?\s*", raw[a:s]):
+                    if raw[a:s].strip() and not re.fullmatch(r"\s*\d{1,3}[./]?\s*", raw[a:s]):
                         lines[k:k + 1] = [(a, s), (s, b)]   # body text, then the footnote, on one line
                         return k + 1
                     return k or None
@@ -1014,11 +1070,20 @@ class Doc:
         return None
 
     def _sentence_end(self, lines):
-        """Source offset just past the first sentence end near the top of these lines, or None."""
+        """Source offset just past the first sentence end near the top of these lines, or None. Not one inside
+        a parenthesis the page's text opened ("(payment ... § 1.01(1)(a), Fla. Stat."): the page's footnotes
+        would land inside it."""
         if not lines:
             return None
         text = "\n".join(self.raw[a:b] for a, b in lines)[:800]
-        m = SENTENCE_END.search(text)
+        m, depth, at = None, 0, 0
+        for x in SENTENCE_END.finditer(text):
+            for ch in text[at:x.end()]:
+                depth = depth + 1 if ch == "(" else max(0, depth - 1) if ch == ")" else depth
+            at = x.end()
+            if depth == 0:
+                m = x
+                break
         if not m:
             return None
         k = m.end()
@@ -1364,8 +1429,9 @@ def classify_court(ct):
         return None
     if re.fullmatch(r"Fla\.?(?: Sup(?:reme|\.)? ?Ct\.?)?", ct):
         return {"id": "SC", "family": "florida", "sub": "a"}
-    m = re.fullmatch(r"(?:Fla\.? ?)?(1st|2d|2nd|3d|3rd|4th|5th|6th) ?(?:DCA|D\. ?C\. ?A\.)", ct)
-    if m:                                  # a space may be missing: "4thDCA" (b-dca-glued), "Fla.4th" (b-fla-glued)
+    m = re.fullmatch(r"(?:Fla\.? ?)?(1st|2d|2nd|3d|3rd|4th|5th|6th) ?(?:DCA\.?|D\. ?C\. ?A\.)", ct)
+    if m:                                  # a space may be missing: "4thDCA" (b-dca-glued), "Fla.4th" (b-fla-glued);
+        #                                    a period after DCA (b-dca-periods)
         return {"id": DCA_ORDINALS[m.group(1)], "family": "florida", "sub": "b"}
     m = re.fullmatch(r"Fla\. (1st|2d|2nd|3d|3rd|4th|5th|6th)", ct)
     if m:                                  # "(Fla. 2d 2020)": DCA left out (b-dca-missing)
@@ -1381,6 +1447,8 @@ def classify_court(ct):
         return {"id": "DCA?", "family": "florida", "sub": "b", "unreadable": True}
     if re.search(r"\bCir(?:cuit|\.)? Ct\.|\bJud(?:icial|\.)? Cir", ct) and re.search(r"\bFla?\.", ct):
         return {"id": "circuit", "family": "florida", "sub": "c"}
+    if re.fullmatch(r"Fla\. (?:[1-9]|1\d|20)(?:st|nd|d|rd|th) Cir(?:cuit|\.)?", ct):
+        return {"id": "circuit", "family": "florida", "sub": "c"}      # "Ct." left out (c-judicial-circuit)
     if re.search(r"\b(?:Cty\.|County|Cnty\.) (?:Ct\.|Court)$", ct):
         return {"id": "county", "family": "florida", "sub": "c"}
     if re.fullmatch(r"(?:Fla\. )?DOAH", ct):
@@ -1409,13 +1477,19 @@ def classify_court(ct):
 
 DATE_TAIL = re.compile(r"(?:,? ?(?P<mon>" + MONTH_RX + r")(?: (?P<day>\d{1,2}))?,?)? ?(?P<year>(?:1[6-9]|20)\d\d)$")
 MONTH_DAY_TAIL = re.compile(r"(?:^|,? )(?P<mon>" + MONTH_RX + r") (?P<day>\d{1,2})$")
+FILED_DATE = re.compile(r"(?:^|,? )filed(?: on)? (?=(?:" + MONTH_RX + r") |(?:1[6-9]|20)\d\d$)")
 
 
 def parse_paren(text):
     """'Fla. 3d DCA Mar. 6, 2002' -> court, year, month, day. None if it isn't a court-and-date
-    parenthetical (an explanatory parenthetical, '(Table)', ...)."""
+    parenthetical (an explanatory parenthetical, '(Table)', ...). A filing's date, 'Fla., filed June 1, 2012',
+    reads the same, with filed set."""
     t = text.strip()
     out = {"text": t, "year": None, "month": None, "day": None}
+    m = FILED_DATE.search(t)
+    if m:
+        out["filed"] = True
+        t = t[:m.start()] + " " + t[m.end():]
     m = DATE_TAIL.search(t)
     court_text = t
     if m:
@@ -1517,7 +1591,7 @@ SEC = r"\d{1,4}[A-Z]?\.\d+[A-Za-z]?(?:" + SUBS_SPACED + r"(?:\d+\.?(?:[a-z]\.)?(
 SECS = (SEC + r"(?:(?:,? (?:and|or|&|through) |, |[-–] ?)(?:" + SEC + r"|" + SUBS + r"(?:[-–]" + SUBS + r")?|\.\d+[\w]*(?:"
         + SUBS + r")?)|[-–]\d{2,4}(?![\d.]))*")
 CHAPTER = r"\d{1,3}[A-Z]?(?:, [Pp]art [IVX]+)?"
-YEAR_PAREN = r"(?: \((?P<year>(?:Supp\. |West )*(?:1[89]|20)\d\d)\))?"
+YEAR_PAREN = r"(?:,? \((?P<year>(?:Supp\. |West )*(?:1[89]|20)\d\d)\))?"     # a stray comma before it, too
 # Not before a word or another period, unless the period begins a table of authorities' leader dots
 # ("Fla. Stat........ 9"), or the word is a footnote number glued to the period ("Fla. Stat.7 The ..."),
 # which is left out of the citation. "Fla Stat." without its first period is read too (f-fla-period).
@@ -1616,6 +1690,8 @@ OFFICIAL_BEFORE = re.compile(r"(?<![\w.,§])\d{1,4} (?P<rep>" + REP_WORD + r"(?:
 # Not an ordinal: "1 So. 3d 100 1st DCA 2009)" lost its "(Fla." and has no pinpoint.
 PIN = re.compile(r"(?:,|,? )(?:at )?(\*{0,2}\d+(?:[-–—]\*{0,2}\d+)?(?: nn?\. ?\d+(?:[-–]\d+)?)?(?: & nn?\. ?\d+)?)(?!\d)(?!(?:st|nd|rd|th|d)\b)")
 PAREN = re.compile(r" ?\(((?:[^()]|\([^()]*\))*)\)")
+# A footnote right after a reporter's page, with no comma: a note on that page ("700 So. 2d 410 n.12").
+FIRST_PAGE_NOTE = re.compile(r" (nn?\. ?\d+(?:[-–]\d+)?)(?![\w.])")
 EXTRA_PAREN = re.compile(r" ?\((?:Table|table|mem\.?|unpublished table decision|per curiam)\)")
 # A docket number after "No.": any run with a digit, to the comma. OCR can put a stray symbol inside
 # one ("4:19¢v77"), and a symbol shouldn't make the number disappear.
@@ -1894,6 +1970,12 @@ class Engine:
             parts, pins, pos = [a], [], a.end()
             part_pins = [[]]                   # each part's own pinpoints: "530 U.S. 1, 5, 120 S. Ct. 2, 9"
             while True:
+                m = FIRST_PAGE_NOTE.match(norm, pos)
+                if m and parts[-1].group("rep") and pos == parts[-1].end():
+                    pin = parts[-1].group("page") + " " + m.group(1)    # a note on the first page: "460 n.35"
+                    pins.append(pin)
+                    part_pins[-1].append(pin)
+                    pos = m.end()
                 while True:
                     m = PIN.match(norm, pos)
                     if not m or m.start(1) in by_start:
@@ -2523,9 +2605,16 @@ def _court_document(doc, c):
     case cited by its number with a court-and-date parenthetical (the name walk takes in a title with no
     pinpoint as part of the name). The title isn't the case's name. Its pinpoint goes after the title (R25),
     or is read after the parenthetical, where writers also put it: "..., No. SC2020-1 (Fla. 2020), at 19".
-    Sets kind court_document, document (the title), pin, and pin_place ("title" or "after")."""
+    Sets kind court_document, document (the title), pin, and pin_place ("title" or "after").
+
+    Or a document cited on Westlaw or LEXIS, its title, "in", and the case: "Reply Brief of Able in Baker,
+    2012 WL 1 (Fla., filed June 1, 2012)" (_filing_online)."""
     norm = doc.norm
     p, name = c.get("paren"), c.get("case_name")
+    if (c["kind"] == "case" and c["online"] and c["online"]["primary"] and not c.get("docket") and p
+            and p["court"]["id"] is not None and p["year"]):
+        _filing_online(doc, c)
+        return
     if (c["kind"] != "case" or not c.get("docket") or not name or c["reporters"] or c["flw"] or c["online"]
             or not p or p["court"]["id"] is None or not p["year"]):
         return
@@ -2550,16 +2639,50 @@ def _court_document(doc, c):
         return
 
 
+# The case a filing on Westlaw comes from, after "in", when the name walk didn't take it (a single name):
+# "Reply Brief of Able in Baker, 2012 WL 1 ...".
+FILING_IN_CASE = re.compile(r" in ((?:In re |Ex parte )?[A-Z][\w.'’&\-]*(?: (?:[A-Z][\w.'’&\-]*|of|the|and|&)){0,6}), $")
+DOC_WORDS_LOWER = {"brief", "petition", "motion", "response", "reply", "answer", "memorandum"}
+
+
+def _filing_online(doc, c):
+    """A filing cited on Westlaw or LEXIS (Indigo Book R25): its title, "in", the case, and the database cite,
+    "Reply Brief of Able in Baker, 2012 WL 1, *2 (Fla. June 1, 2012)", or the title's "in" before a case the
+    name walk read, "Brief of Cole in Able v. Baker, 2012 WL 2 (...)". Briefs on Westlaw carry the filing's
+    date ("(Fla., filed June 1, 2012)"). The title may end in a lowercase document word ("Able's Supreme
+    Court brief in ..."). Sets kind court_document, document, case_name, and pin (the star page, if any)."""
+    norm = doc.norm
+    if c.get("case_name"):
+        ns = c["name_start"]
+        if norm[max(0, ns - 4):ns] != " in ":
+            return
+        q, name = ns - 4, c["case_name"]
+    else:
+        cs = c["online"]["start"]
+        m = FILING_IN_CASE.search(norm, max(0, cs - 120), cs)
+        if not m or m.end() != cs:
+            return
+        q, name, ns = m.start(), m.group(1), m.start(1)
+    title = _document_title(doc, q, loose=True)
+    if title is None:
+        return
+    start, text, pin = title
+    c.update(kind="court_document", document=text, case_name=name, name_start=ns, start=start,
+             pin=pin or (c["pins"][0] if c["pins"] else None), pin_place="title" if pin else None)
+
+
 DOC_TITLE_REACH = 300            # characters a title may run back from its comma
 DOC_TITLE_WORDS = 25
 
 
-def _document_title(doc, q):
+def _document_title(doc, q, loose=False):
     """A document's title ending at offset q, with its pinpoint: (start, title, pin) or None. The title is
     capitalized words, numbers after an abbreviation ("Fla. R. Civ. P. 1.540"), and small connectors, after
     any signal and a sentence's end (a period after a word that isn't an abbreviation, unless more
     abbreviations follow it: "Court. Initial Br." but a misspelled "Fla. R. Cvl. P."); it needs a document
-    word (DOC_WORDS, DOC_WORDS_LEAD). The sentence layer isn't asked: it ends a sentence inside a rule's number."""
+    word (DOC_WORDS, DOC_WORDS_LEAD). The sentence layer isn't asked: it ends a sentence inside a rule's number.
+    loose, for a title followed by "in" and a case (_filing_online): a document word anywhere in it, or a
+    lowercase one ("Able's merits brief")."""
     norm = doc.norm
     bound = max(0, q - DOC_TITLE_REACH)
     head = norm[bound:q]
@@ -2584,7 +2707,7 @@ def _document_title(doc, q):
             # "Rule 1.540"; not a table of authorities' page number before the entry
             if not (k and re.fullmatch(r"[A-Z][\w.]*\.|Rule|Section|Count|Claim", toks[k - 1].group(0))):
                 break
-        elif not (t[0].isupper() or t in DOC_CONNECTORS):
+        elif not (t[0].isupper() or t in DOC_CONNECTORS or (loose and t in DOC_WORDS_LOWER)):
             break
         first = k
     words = [t.group(0) for t in toks[first:]]
@@ -2596,7 +2719,7 @@ def _document_title(doc, q):
     lead = True                          # only a possessive, a modifier, or a document word so far
     found = False
     for w in words:
-        if w in DOC_WORDS or (w in DOC_WORDS_LEAD and lead):
+        if w in DOC_WORDS or (w in DOC_WORDS_LEAD and (lead or loose)) or (loose and w in DOC_WORDS_LOWER):
             found = True
         elif not (DOC_POSSESSIVE.fullmatch(w) or w in DOC_MODIFIERS):
             lead = False
@@ -2797,6 +2920,8 @@ def lc_slip_old_form(ctx, rec):
 def lc_westlaw_docket(ctx, rec):
     for c in _full_cases(ctx):
         o = c["online"]
+        if c["kind"] == "court_document":
+            continue                           # a filing on Westlaw, not a slip opinion (_filing_online)
         if (o and o["primary"] and not c["docket"] and not c["history"] and c["paren"] and c.get("sub")
                 and c["tier"] == TIER_RULE):
             yield {"start": o["start"], "end": c["paren"]["end"], "citation": c,
@@ -3225,15 +3350,31 @@ SIGNAL_GAP = 20                  # characters between a citation's end and the s
 
 
 def lc_name_comma(ctx, rec):
-    norm = ctx["doc"].norm
+    """A case name run into its citation with no comma. Not a table of authorities' hanging entry, the name on
+    a line of its own and the citation indented below: there the line break stands for the comma. A one-line
+    entry needs it."""
+    doc = ctx["doc"]
+    norm = doc.norm
     for c in ctx["cites"]:
         if not c.get("comma_missing") or c["in_quote"]:
+            continue
+        if _toa_entry(doc, c) and _hanging(doc, c, ctx["source"]):
             continue
         s = c["cite_start"]
         a = norm.rfind(" ", 0, s - 1) + 1                 # the name's last word
         b = s + re.match(r"\S+", norm[s:]).end()         # the volume
         yield {"start": a, "end": b, "citation": c, "fix": norm[a:s - 1] + ", " + norm[s:b],
                "authority": c["authority"] if c["tier"] == TIER_RULE else "9.800(p); Indigo Book R11.1"}
+
+
+def _hanging(doc, c, source):
+    """Is citation c's case name on a line of its own above it: one of the layout's hanging names
+    (Source.hanging), or, with no layout, a line break in the text before an indented citation?"""
+    name = " ".join(doc.norm[c["name_start"]:c["cite_start"]].split())
+    if source.hanging is not None:
+        return any(name == h or name.endswith(" " + h) for h in source.hanging)
+    between = doc.raw[doc.raw_pos(c["cite_start"] - 1):doc.raw_pos(c["cite_start"])]
+    return bool(re.fullmatch(r"[ \t]*\n[ \t]+", between))
 
 
 def lc_signal_capital(ctx, rec):
@@ -3428,8 +3569,9 @@ def link_short_forms(doc, cites):
     fulls = [c for c in cites if c["kind"] == "case" and not c.get("placeholder")]
     by_key = {}
     # A placeholder ("--- So. 3d ---, 2023 WL 1234567") is still the case's full citation, known by its other
-    # numbers (_case_keys takes no volume that isn't one).
-    for c in [c for c in cites if c["kind"] == "case"]:
+    # numbers (_case_keys takes no volume that isn't one). A filing cited on Westlaw is known by its cite too
+    # ("Able's Brief, 2012 WL 1, *2" after "Reply Brief of Able in Baker, 2012 WL 1 (Fla. 2012)").
+    for c in [c for c in cites if c["kind"] == "case" or (c["kind"] == "court_document" and c["online"])]:
         for k in _case_keys(c):
             by_key.setdefault(k, []).append(c)
 
@@ -3968,6 +4110,67 @@ UNREAD_SOURCE = ("followed by a citation the script can't read, which is probabl
                  "find the source by hand")
 
 
+def _lead_in(doc, cites, usable, starts, a):
+    """The citation a block quotation's lead-in gives as its source: the lead-in ends in a colon right before
+    the block, and its sentence holds one citation, with a page ("As stated in Able v. Baker, 1 So. 3d 1, 5
+    (Fla. 2013):"). The block may be read in pieces, with a page's footnotes between: the lead-in is the first
+    piece's, unless a piece opens a quotation of its own after a colon ('... stating: "...'), a sign the pieces
+    hold more than one quotation. None otherwise, or when a citation with no signal follows the last piece:
+    that one is the block's source (tie_quotations' rule 2)."""
+    norm = doc.norm
+    pieces = sorted(doc.block_quotes)
+    spans = list(doc.footnotes) + pieces
+    if any(x == a and re.search(r":\s*[\"“]", norm[x:y]) for x, y in pieces):
+        return None
+    j, moved = a, True
+    while moved:
+        moved = False
+        while j > 0 and norm[j - 1].isspace():
+            j -= 1
+        for x, y in spans:
+            if x < j and not norm[min(y, j):max(y, j)].strip():      # it ends at j, but for space
+                if (x, y) in pieces and re.search(r":\s*[\"“]", norm[x:y]):
+                    return None
+                j, moved = x, True
+                break
+    if j == 0 or norm[j - 1] != ":":
+        return None
+    e, moved = a, True                     # the last piece's end
+    while moved:
+        moved = False
+        for x, y in spans:
+            if y > e and (x <= e or not norm[e:x].strip()):
+                e, moved = y, True
+                break
+    k = bisect.bisect_left(starts, e)
+    if k < len(usable):
+        gap = norm[e:usable[k]["start"]]
+        if QUOTE_THEN_CITE.fullmatch(gap) and not re.search(r"[A-Za-z]", gap):
+            return None
+    s = doc.sentences.start(j - 1)
+    inside = [c for c in usable[bisect.bisect_left(starts, s):bisect.bisect_left(starts, j - 1)]
+              if c.get("nested_in") is None]
+    if len(inside) != 1 or doc.stream(inside[0]["start"]) != doc.stream(a):
+        return None
+    c = inside[0]
+    if c["kind"] not in ("case", "case_short", "id") or not quotation_pin(c, cites):
+        return None
+    return c
+
+
+def _past_footnotes(doc, i):
+    """The norm offset past the footnotes that begin at offset i (after space, or a period, comma, or
+    semicolon, a footnote's marker, and space): where a quotation ending a page's body goes on, on the next
+    page. i when no footnote begins there."""
+    j = re.compile(r"[.,;]?(?:\d{1,3}/?)?\s*").match(doc.norm, i).end()
+    out = i
+    for a, b in doc.footnotes:
+        if a <= j < b and not doc.norm[a:j].strip():
+            out = b
+            j = re.compile(r"\s*").match(doc.norm, b).end()
+    return out
+
+
 def tie_quotations(doc, cites):
     """Each quotation of MIN_QUOTE_WORDS or more, with the citation it's tied to (or none)."""
     norm, sents = doc.norm, doc.sentences
@@ -4005,15 +4208,26 @@ def tie_quotations(doc, cites):
         # that closes after it: '(rejecting it because "...")'; Chandler v. Crosby, ...' isn't Chandler's.
         elif q["citation"] is None:
             close = e + (0 if block else 1)
-            k = bisect.bisect_left(starts, close)
-            if k < len(usable) and doc.stream(usable[k]["start"]) == stream:
-                c, gap = usable[k], norm[close:usable[k]["start"]]
-                if QUOTE_THEN_CITE.fullmatch(gap):
+            # A quotation that ends a page's body, then the page's footnotes, then its citation opening the next
+            # page: the citation follows it, as if the footnotes weren't there.
+            at = _past_footnotes(doc, close)
+            k = bisect.bisect_left(starts, at)
+            # A block quotation's lead-in may name its source and page ("As stated in Able, 1 So. 3d 1, 5 (Fla.
+            # 2013):"); a citation after the block with a signal ("See also Baker, ...") is more authority, not the
+            # source. One with no signal is the source, as for any quotation.
+            lead = _lead_in(doc, cites, usable, starts, a) if block else None
+            if (k < len(usable) and doc.stream(usable[k]["start"]) == stream
+                    and not (at > close and usable[k]["kind"] == "case" and usable[k]["paren"] is None)):
+                # (past footnotes, not a case cut off, as by the next page's footnotes, before its pinpoint)
+                c, gap = usable[k], norm[at:usable[k]["start"]]
+                if lead is not None and QUOTE_THEN_CITE.fullmatch(gap) and re.search(r"[A-Za-z]", gap):
+                    pass
+                elif QUOTE_THEN_CITE.fullmatch(gap):
                     # A citation that completes the quoting sentence ('This "test comes from" Able, 1 U.S. 1 (1990).')
                     # is its object; a citation sentence after it is the quotation's source. Not a citation clause
                     # set off in the sentence, after the quotation's own comma ('"... practice," Id. at 837, and')
                     # or before more of it, which is the quotation's source.
-                    integral = (not block and sents.same_sentence(close - 1, c["start"])
+                    integral = (not block and at == close and sents.same_sentence(close - 1, c["start"])
                                 and norm[e - 1:e].isalnum() and not re.search(r"[,;]", gap)
                                 and sents.ends_at(c["end"]))
                     after = _citation_sentence_after(doc, sents, usable, starts, c["start"]) if integral else None
@@ -4023,7 +4237,8 @@ def tie_quotations(doc, cites):
                         q["citation"], q["attributed_by"] = after["index"], "citation sentence"
                     else:
                         q["citation"], q["attributed_by"] = c["index"], "follows"
-                elif (not block and not doc.unread.unread(close, c["start"]) and re.match(r"[,;:]?\s+[a-z]", gap)
+                elif (not block and at == close and not doc.unread.unread(close, c["start"])
+                      and re.match(r"[,;:]?\s+[a-z]", gap)
                       and sents.same_sentence(close - 1, close)):
                     # the quotation's own sentence goes on, then ends, and the citation opens the next:
                     # '"..." and reversed. Smith, ...'. No other quotation or parenthesis on the way, and
@@ -4033,7 +4248,9 @@ def tie_quotations(doc, cites):
                             and sents.index(c["start"]) == sents.index(end) + 1
                             and SIGNAL_LEAD.fullmatch(norm[sents.start(c["start"]):c["start"]])):
                         q["citation"], q["attributed_by"] = c["index"], "end of sentence"
-            if q["citation"] is None and RECORD_AFTER.match(norm, close):
+            if q["citation"] is None and lead is not None:
+                q["citation"], q["attributed_by"] = lead["index"], "lead-in"
+            if q["citation"] is None and RECORD_AFTER.match(norm, at):
                 q["note"] = "followed by a record cite: the source is the record, not case law"
         out.append(q)
     # 3. Quotations in one sentence share its citation: '"The statute," the court said, "is clear." Smith, ...'

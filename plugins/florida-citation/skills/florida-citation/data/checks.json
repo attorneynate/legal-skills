@@ -86,9 +86,9 @@
      "examples": {"match": ["(Fla. 3rd DCA 1988)", "(Fla. 2nd DCA 1988)", "(Fla. 2nd DCA July 1, 2022)", "(2nd DCA 1988)"], "no_match": ["(Fla. 3d DCA 1988)", "(Fla. 2d DCA 1988)", "the 2nd DCA's decision rests on", "as held by the 2nd DCA in its opinion", "B. The 2nd DCA's Recent Decision", "(the 3rd DCA 1988 decision)", "the Second District (2nd DCA) held"]}},
 
     {"id": "b-dca-periods", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\b(\\d(?:st|d|nd|rd|th)) D\\. ?C\\. ?A\\.(?= (?:[A-Z][a-z]{2,8}\\.? \\d{1,2}, )?(?:1[89]|20)\\d\\d\\))", "fix": "\\1 DCA",
+     "pattern": "\\b(\\d(?:st|d|nd|rd|th)) (?:D\\. ?C\\. ?A\\.|DCA\\.)(?= (?:[A-Z][a-z]{2,8}\\.? \\d{1,2}, )?(?:1[89]|20)\\d\\d\\))", "fix": "\\1 DCA",
      "message": "The rule writes DCA without periods.",
-     "examples": {"match": ["(Fla. 3d D.C.A. 1988)", "(Fla. 1st D. C. A. 1990)", "(Fla. 4th D.C.A. Mar. 6, 2002)"], "no_match": ["(Fla. 3d DCA 1988)", "the 3d D.C.A. held in 1988 that", "as the 1st D. C. A. explained"]}},
+     "examples": {"match": ["(Fla. 3d D.C.A. 1988)", "(Fla. 1st D. C. A. 1990)", "(Fla. 4th D.C.A. Mar. 6, 2002)", "(Fla. 2d DCA. 1994)"], "no_match": ["(Fla. 3d DCA 1988)", "the 3d D.C.A. held in 1988 that", "as the 1st D. C. A. explained", "the 2d DCA. In 1994 it"]}},
 
     {"id": "b-dca-no-fla", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
      "pattern": "\\(((?:1st|2d|3d|4th|5th|6th) DCA)", "fix": "(Fla. \\1",
@@ -120,9 +120,9 @@
      "examples": {"match": ["Doe v. Roe, 100 So. 3d 1 (Fla. App. 4th Dist. 2012).", "Doe v. Roe, 500 So. 2d 1 (Fla.App. 3 Dist. 1988)."], "no_match": ["Doe v. Roe, 100 So. 3d 1 (Fla. 4th DCA 2012).", "Doe v. Roe, 500 So. 2d 1 (Fla. Dist. Ct. App. 1988)."]}},
 
     {"id": "f-name-first", "authority": "9.800(f)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\bFlorida Statutes?,? ?(?:[Ss]ection|§) ?(\\d+\\.\\d+(?:\\([\\w]+\\))*)(?:,? Florida Statutes\\b)?", "fix": "section \\1, Florida Statutes",
+     "pattern": "\\bFlorida Statutes?,? ?(?:[Ss]ection|§) ?(\\d+\\.\\d+)(?: ?(\\((?!(?:1[89]|20)\\d\\d\\))\\w+\\)))?(?: ?(\\((?!(?:1[89]|20)\\d\\d\\))\\w+\\)))?(?: ?(\\((?!(?:1[89]|20)\\d\\d\\))\\w+\\)))?(?:,? Florida Statutes\\b)?", "fix": "section \\1\\2\\3\\4, Florida Statutes",
      "message": "Florida's form puts the section first: section 48.031, Florida Statutes, in a sentence; § 48.031, Fla. Stat., standing alone.",
-     "examples": {"match": ["under Florida Statute Section 48.031, service was", "as Florida Statute § 48.031(1) provides", "as Florida Statute§ 48.031(1) provides", "service was made under Florida Statutes Section 48.031, Florida Statutes before the deadline"], "no_match": ["section 48.031, Florida Statutes", "the Florida Statutes provide"]}},
+     "examples": {"match": ["under Florida Statute Section 48.031, service was", "as Florida Statute § 48.031(1) provides", "as Florida Statute§ 48.031(1) provides", "service was made under Florida Statutes Section 48.031, Florida Statutes before the deadline", "as Florida Statute §48.031 (2)(a) provides"], "no_match": ["section 48.031, Florida Statutes", "the Florida Statutes provide"]}},
 
     {"id": "court-unreadable", "authority": "9.800(b)(1)", "severity": "check", "kind": "logic", "logic": "court_unreadable",
      "message": "The district in the parenthetical isn't one Rule 9.800 names, or isn't where the rule puts it: a typo, or an OCR misreading ('Ist' for '1st', 'Sth' for '5th').",
@@ -147,9 +147,9 @@
      "examples": {"match": ["Doe v. Roe, 500 F. Supp. 3d 100, 105 (S.D. Fla. Feb. 3, 2021)."], "no_match": ["Doe v. Roe, 500 F. Supp. 3d 100, 105 (S.D. Fla. 2021).", "Doe v. Roe, ___ F. Supp. 3d ___, 2021 WL 123456 (S.D. Fla. Feb. 3, 2021).", "Doe v. Roe, 300 So. 3d 100, 45 Fla. L. Weekly D10 (Fla. 1st DCA Jan. 2, 2020)."]}},
 
     {"id": "c-judicial-circuit", "authority": "9.800(c)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\(Fla\\. (\\d+(?:st|nd|d|rd|th)) Jud(?:icial|\\.)? Cir(?:cuit|\\.)?(?: Ct\\.)? ", "fix": "(Fla. \\1 Cir. Ct. ",
+     "pattern": "\\(Fla\\. (\\d+(?:st|nd|d|rd|th)) (?:Jud(?:icial|\\.)? Cir(?:cuit|\\.)?(?: Ct\\.)?|Cir(?:cuit|\\.)?(?! Ct\\.| Court)) ", "fix": "(Fla. \\1 Cir. Ct. ",
      "message": "A circuit court's parenthetical is (Fla. 17th Cir. Ct. date).",
-     "examples": {"match": ["(Fla. 17th Jud. Cir. Feb. 13, 2010)", "(Fla. 9th Judicial Circuit Dec. 9, 1996)"], "no_match": ["(Fla. 17th Cir. Ct. Feb. 13, 2010)"]}},
+     "examples": {"match": ["(Fla. 17th Jud. Cir. Feb. 13, 2010)", "(Fla. 9th Judicial Circuit Dec. 9, 1996)", "(Fla. 8th Cir. Apr. 4, 2016)", "(Fla. 12th Circuit 2011)"], "no_match": ["(Fla. 17th Cir. Ct. Feb. 13, 2010)", "(Fla. 8th Circuit Court 2011)", "(11th Cir. 2010)"]}},
 
     {"id": "c-county-court", "authority": "9.800(c)(2)", "severity": "error", "kind": "pattern",
      "pattern": "(?<=\\()([A-Z][A-Za-z.\\-]+(?: [A-Z][A-Za-z.\\-]+)?) (?:County|Cnty\\.) (?:Ct\\.|Court) ", "fix": "\\1 Cty. Ct. ",
@@ -336,9 +336,9 @@
      "examples": {"match": ["332 F. Supp. 1107 (S.D.Fla. 1971)", "332 F. Supp. 1107 (SD Fla 1971)"], "no_match": ["332 F. Supp. 1107 (S.D. Fla. 1971)"]}},
 
     {"id": "o-bluebook-order-amend", "authority": "9.800(o)(2)", "severity": "error", "kind": "pattern",
-     "pattern": "\\bU\\.S\\. Const\\. amend\\. ([IVXL]+)\\b", "fix": "Amend. \\1, U.S. Const.",
+     "pattern": "\\bU\\.S\\. Const\\. amend(s?)\\. ([IVXL]+(?:(?:,? (?:&|and) |, )[IVXL]+)*)\\b", "fix": "Amend\\1. \\2, U.S. Const.",
      "message": "Florida's form puts the amendment first: Amend. V, U.S. Const.",
-     "examples": {"match": ["U.S. Const. amend. V."], "no_match": ["Amend. V, U.S. Const."]}},
+     "examples": {"match": ["U.S. Const. amend. V.", "U.S. Const. amend. IV, XIV.", "U.S. Const. amends. I & XIV."], "no_match": ["Amend. V, U.S. Const.", "Amends. IV, XIV, U.S. Const."]}},
 
     {"id": "o-bluebook-order-art", "authority": "9.800(o)(1)", "severity": "error", "kind": "pattern",
      "pattern": "\\bU\\.S\\. Const\\. art\\. ([IVX]+), § ?(\\d+), cl\\. (\\d+)", "fix": "Art. \\1, § \\2, cl. \\3, U.S. Const.",

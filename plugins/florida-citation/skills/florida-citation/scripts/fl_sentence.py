@@ -634,8 +634,15 @@ RECORD_RX = re.compile(r"(?<![\w.])(?:(?:Trial|Supp\.|Vol\.|V\d+|[IVX]+|PC|Post-
                        r"(?:at |p\. ?|pp\. ?|\d+:)?\d+")
 # Depositions, transcripts, affidavits, and exhibits in a trial-court filing ("Dep. A. Smith, at 12:4-6",
 # "Smith Dep. 12:4", "Hr'g Tr. 5", "Aff. ¶ 3", 'Exhibit "C"'), and any page:line pinpoint. An Id. after one
-# of these refers to it, not to the case or statute before it.
-TRANSCRIPT_RX = re.compile(r"(?<![\w.])(?:Dep(?:o)?\.|Deposition|Tr\.|Transcript|Aff\.|Affidavit|Decl\.|Declaration)(?=[\s,])"
+# of these refers to it, not to the case or statute before it. A word spelled out is a sign only with a pinpoint:
+# a page, paragraph, or section after it, past a short name ("Affidavit of Dr. Able at 3", "Declaration ¶ 4",
+# "Declaration § 3.2"), or a section of it before ("Section 2.2 of the Declaration"). Alone it's prose more often
+# than a cite ("the Declaration of Condominium"); the Declaration of Rights is the constitution's.
+TRANSCRIPT_RX = re.compile(r"(?<![\w.])(?:Dep(?:o)?\.|Tr\.|Aff\.|Decl\.)(?=[\s,])"
+                           r"|(?<![\w.])(?:Deposition|Transcript|Affidavit|Declaration)(?! of (?:Rights|Independence))"
+                           r"(?=(?:,? (?:of )?[A-Z][\w'’\-]*\.?){0,4},? (?:at |pp?\. ?|¶¶? ?|§§? ?|[Ss]ections? )?\d)"
+                           r"|\b(?:[Ss]ections?|§§?) ?\d[\w.()]* of (?:the |this |that )?(?:[A-Z][\w'’\-]* )?"
+                           r"(?:Deposition|Transcript|Affidavit|Declaration)\b(?! of (?:Rights|Independence))"
                            r"|\b(?:Exhibit|Ex\.) [\"“]?[A-Z0-9]{1,3}\b"
                            r"|(?<![\d:])\d{1,4}: ?\d{1,2}(?:-\d{1,4}(?::\d{1,2})?)?(?![\d:])")
 # A page:line that is a time of day: "at 10:30 a.m.", "9:15 p.m.", "at 3:00 o'clock".
@@ -677,9 +684,10 @@ SIGNS = [
                             + r"|\b[A-Z][A-Za-z.']*\.(?: ?\d?[a-z]{0,2})? at (?:pp?\. ?)?\*?\d+(?![\d:])"
                             + r"|\b" + DOCUMENT_WORDS + r",? (?:" + PIN_AT + r"|\d+" + PIN_END + r")")),
     # A date parenthetical: "(2012)", "(Jan. 2016)", "(Mar. 1, 2020)", "(Spring 2019)", or a court, an
-    # editor, or an edition before the year: "(Fla. Dep't of Corr. 2016)", "(Amy Able ed., 1997)".
+    # editor, or an edition before the year: "(Fla. Dep't of Corr. 2016)", "(Amy Able ed., 1997)". Not a record
+    # cite whose page reads as a year: "(T. 1975)", "(R. 2011)".
     ("date", re.compile(r"\((?:" + MONTH + r" (?:\d{1,2}, ?)?|(?:Spring|Summer|Fall|Autumn|Winter) )?" + YEAR + r"\)"
-                        r"|\((?=[A-Z\d])[^()]{0,80}?[.,] ?" + YEAR + r"\)")),
+                        r"|\((?!(?:" + RECORD_RX.pattern + r")\))(?=[A-Z\d])[^()]{0,80}?[.,] ?" + YEAR + r"\)")),
     ("visited", re.compile(r"\(last (?:visited|accessed|updated)\b[^()]{0,60}\)|\bavailable at\b", re.I)),
     ("url", re.compile(r"(?<![@\w])(?:https?://|www\.)[^\s<>\"”)\]]+"
                        r"|(?<![@\w./\-])[a-z][\w\-]*(?:\.[\w\-]+)*\.(?:gov|org|com|edu|net|us)(?:/[^\s<>\"”)\]]*)?(?![\w@])")),
