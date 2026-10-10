@@ -1349,8 +1349,9 @@ def classify_court(ct):
         return {"id": m.group(1) + "D", "family": "florida", "sub": "b", "west": True}
     if re.fullmatch(r"Fla\.? ?(?:Dist\. ?Ct\. ?)?App\..*", ct):
         return {"id": "DCA", "family": "florida", "sub": "b"}
-    if re.fullmatch(r"Fla\.? \S+ (?:DCA|D\. ?C\. ?A\.)", ct):
-        # "Fla. Ist DCA", "Fla. Sth DCA": an OCR-garbled or mistyped district
+    if re.fullmatch(r"Fla\.? (?:\S+ )?(?:DCA|D\. ?C\. ?A\.)(?: \d\w{0,3})?", ct):
+        # "Fla. Ist DCA", "Fla. Sth DCA": an OCR-garbled or mistyped district; "Fla. DCA": none; "Fla. DCA 3rd":
+        # one after DCA, out of the rule's order
         return {"id": "DCA?", "family": "florida", "sub": "b", "unreadable": True}
     if re.search(r"\bCir(?:cuit|\.)? Ct\.|\bJud(?:icial|\.)? Cir", ct) and re.search(r"\bFla?\.", ct):
         return {"id": "circuit", "family": "florida", "sub": "c"}
@@ -2945,8 +2946,10 @@ def lc_court_unreadable(ctx, rec):
     for c in _full_cases(ctx):
         p = c["paren"]
         if p and p["court"].get("unreadable"):
-            yield {"start": p["start"], "end": p["end"], "citation": c,
-                   "detail": f"'{p['court_text']}' names no district; which one is a fact to look up."}
+            m = re.search(r"(?:DCA|D\. ?C\. ?A\.) (\d\w{0,3})$", p["court_text"])
+            detail = (f"'{p['court_text']}' puts the district after DCA; the rule's order is (Fla. 3d DCA 2010)."
+                      if m else f"'{p['court_text']}' names no district; which one is a fact to look up.")
+            yield {"start": p["start"], "end": p["end"], "citation": c, "detail": detail}
 
 
 def lc_west_circuit(ctx, rec):
@@ -3042,14 +3045,48 @@ def spelled_out(c, text, data):
     return None
 
 
-def _mark_record(doc, c, prev, cites):
-    """Mark an Id. that repeats a record cite (Indigo Book R26): one between it and the citation before
-    it (or the document's start), or an Id. just before it that does, with nothing else the script can't
-    read between (fl_sentence.Unread.between). record_para: the record cite is to a paragraph ("Smith
-    Aff. ¶ 78")."""
+# A footnote's number glued to a word or a closing mark ("the rule,4 and", "Florida)12 The"), not a page and
+# line or a list of pages ("5:12", "10,11"). After a sentence end the sentence layer reads it (Periods.past),
+# so a decimal ("3.5 percent") isn't one.
+FOOTNOTE_CALL = re.compile(r"(?<=[A-Za-z,;:)\]\"'”’])(?<!\d[,;:])\d{1,3}(?=\s)")
+
+
+def _footnote_call(doc, a, b):
+    """Is there a footnote's number in norm[a:b] whose footnote text isn't there too? Its text, placed at the
+    page's foot or the document's end, comes after b in reading order and may hold the authority an Id. at
+    b refers to. A number in a quotation is the quoted writer's footnote, whose text the document doesn't hold."""
     norm = doc.norm
-    gap = _gap(norm, prev["end"] if prev else 0, c["start"], cites)
+    calls = [m.start() for m in FOOTNOTE_CALL.finditer(norm, a, b)]
+    p = doc.periods
+    for e in p.ends[bisect.bisect_left(p.ends, a):bisect.bisect_left(p.ends, b)]:
+        past = p.past(e)
+        if past is not None and any(ch.isdigit() for ch in norm[e + 1:past]):
+            calls.append(e + 1)
+    return any(not doc.unread.quoted(k) and not any(k <= fa < b for fa, _ in doc.footnotes)
+               and doc.stream(k) == doc.stream(b) for k in calls)
+
+
+def _record_only(signs):
+    """Are the signs only a record or transcript cite's? One standing alone is also a citation clause ("See
+    R. 45.") and may read as a pinpoint ("IB. at 29"), as count_unread's record line takes them."""
+    recs = [s for s in signs if s.name in RECORD_SIGNS]
+    return all(s.name in RECORD_SIGNS or (s.name in RECORD_ALSO and any(r.start < s.end and s.start < r.end
+                                                                        for r in recs)) for s in signs)
+
+
+def _mark_record(doc, c, prev, cites):
+    """Mark an Id. that repeats a record cite (Indigo Book R26): the last record cite between it and the
+    citation before it (or the document's start), or an Id. just before it that does, with nothing else the
+    script can't read between (fl_sentence.Unread.between), and no footnote's number whose text may hold
+    what the Id. refers to (_footnote_call). record_para: the record cite is to a paragraph ("Smith Aff.
+    ¶ 78")."""
+    norm = doc.norm
+    a = prev["end"] if prev else 0
+    gap = _gap(norm, a, c["start"], cites)
     recs = [m.end() for rx in (RECORD_RX, TRANSCRIPT_RX) for m in rx.finditer(gap)]
+    if recs and (not _record_only(doc.unread.between(a + max(recs), c["start"]))
+                 or _footnote_call(doc, a + max(recs), c["start"])):
+        recs = []                      # something after the last record cite may be what the Id. refers to
     pin = ID_TRANSCRIPT_PIN.match(norm, c["start"])
     if pin and (norm[pin.end():pin.end() + 1] == ":" or (prev and prev["kind"] == "id" and not prev.get("record"))):
         pin = None                     # an audio timestamp ("Id. at 6:07:13", then "Id. at 43:45"), not a
@@ -3059,7 +3096,7 @@ def _mark_record(doc, c, prev, cites):
         c["record"] = True
         c["record_para"] = bool(last is not None and re.match(r"[\s,]*¶", gap[last:last + 6]))
     elif (prev and prev["kind"] == "id" and prev.get("record")
-          and not any(s.name not in ("record", "transcript") for s in doc.unread.between(prev["end"], c["start"]))):
+          and _record_only(doc.unread.between(prev["end"], c["start"]))):
         c["record"], c["record_para"] = True, prev.get("record_para")
 
 
@@ -3348,7 +3385,9 @@ def link_short_forms(doc, cites):
     links = {"ids": [], "shorts": [], "supras": [], "repeats": []}
     fulls = [c for c in cites if c["kind"] == "case" and not c.get("placeholder")]
     by_key = {}
-    for c in fulls:
+    # A placeholder ("--- So. 3d ---, 2023 WL 1234567") is still the case's full citation, known by its other
+    # numbers (_case_keys takes no volume that isn't one).
+    for c in [c for c in cites if c["kind"] == "case"]:
         for k in _case_keys(c):
             by_key.setdefault(k, []).append(c)
 
@@ -3466,11 +3505,12 @@ def link_short_forms(doc, cites):
         prev, earlier = c, prev
 
     # The same full citation twice, close together (Indigo Book R15.2.1 allows repeating it after a
-    # new heading or page break, so only repeats on the same page count; separate opinions restart).
+    # new heading or page break, so only repeats on the same page count; separate opinions restart). A
+    # citation in a heading is neither: the text under it starts afresh.
     seen = {}
     breaks = [m.start() for m in SEPARATE_OPINION.finditer(norm)]
     for c in fulls:
-        if c["in_quote"] or not c["paren"] or _toa_entry(doc, c):
+        if c["in_quote"] or not c["paren"] or _toa_entry(doc, c) or _in_heading(doc, c):
             continue                       # "Casadesus, 160 So. 3d 436" is a malformed short form, not a full one
         k = _full_key(c)
         if k is None:
@@ -3485,6 +3525,33 @@ def link_short_forms(doc, cites):
         if c["nested_in"] is None:         # one cited inside another's parenthetical may be given in full later
             seen[k] = c
     return links
+
+
+# A heading's mark that the sentence layer read as a sentence of its own, after the sentence before it ("...
+# Court. B. First Motion: Able v."), not a pinpoint's page ("at 69. Similarly, in Able v.").
+MARK_BEFORE = re.compile(r"(?:^|[.!?:;)\]\"'”’]\s+)((?:[IVX]+|[A-Z]|\d{1,2})\.\s*)$")
+
+
+def _in_heading(doc, c):
+    """Is citation c in a heading: the text from its sentence's start to it a heading's mark and title ("B. First
+    Postconviction Motion: Able v. State, ..."), or in capitals (fl_sentence's heading test)? With a mark, the
+    title needs two words or more, none lowercase but the small ones, so a numbered paragraph ("12. In Able v.
+    State, ...") isn't one."""
+    norm = doc.norm
+    s = doc.sentences.start(c["start"])
+    lead = norm[s:c["start"]]
+    m = MARK_BEFORE.search(norm, max(0, s - 8), s)
+    if m:
+        lead = m.group(1) + lead
+    words = re.findall(r"[A-Za-z][A-Za-z'’.\-]*", lead)
+    if fs.mostly_capitals(words):
+        return True
+    mark = fs.HEADING_MARK.match(lead)
+    if not mark:
+        return False
+    words = re.findall(r"[A-Za-z][A-Za-z'’.\-]*", lead[mark.end():])
+    return (len(words) >= 2 and all(w[0].isupper() or w.lower() in fs.TITLE_WORDS for w in words)
+            and any(w.lower().rstrip(".") not in fs.TITLE_WORDS for w in words))
 
 
 def _id_case_first(x, cites):
@@ -4078,7 +4145,14 @@ def lc_short_before_full(ctx, rec):
 
 
 def lc_short_without_full(ctx, rec):
-    norm = ctx["doc"].norm
+    """A short form with no full citation of its case in the document (a table of authorities' line counts as
+    one, and so does a placeholder, "--- So. 3d ---, 2023 WL 1234567": link_short_forms). A claim about the
+    whole document, so it's withheld when a passage the script didn't read holds the short form's volume and
+    reporter or its Westlaw number: the full citation may be there (a table's cells the reading order
+    interleaves)."""
+    doc = ctx["doc"]
+    norm = doc.norm
+    unread = [norm[s["start"]:s["end"]] for s in doc.unread.unread_spans(quoted=True)]
     for e in ctx["links"]["shorts"]:
         c = e["cite"]
         if e["any"] or e["mismatch"] or c.get("refers_to") is not None:
@@ -4088,6 +4162,12 @@ def lc_short_without_full(ctx, rec):
             n = re.escape(re.sub(r" (?:I|II|III|IV|V)$", "", name))
             if re.search(r"\b" + n + r",? v\. |\bv\. " + n + r"\b|\b" + n + r" \(", norm):
                 continue                   # named in a caption the script couldn't read whole (split by a page)
+        keys = _case_keys(c)
+        marks =[r"\b" + re.escape(k[1]) + r"\s*" + re.escape(k[2]).replace(r"\ ", r"\s*") + r"(?!\w)"
+                 for k in keys if k[0] == "rep"]
+        marks += [r"\b" + k[3] + r"\b" for k in keys if k[0] == "online"]
+        if any(re.search(m, u) for m in marks for u in unread):
+            continue
         yield {"start": c["start"], "end": c["end"], "citation": c}
 
 

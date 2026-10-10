@@ -53,17 +53,17 @@ What it checks, beyond abbreviations and spacing:
 - **Punctuation that hides where a citation ends** (to check): parentheses that don't pair, a quotation mark that opens and never closes before a citation, and a statute subsection that can't be read, for which no fix is offered rather than one that drops it.
 - **Quotations without a page** (to check): a quotation from a case whose citation gives no pinpoint, directly, through Id., or through a short form. A defined term in a parenthetical, `(the "Agreement")`, isn't taken for a quotation.
 - **Signals and ellipses:** a signal capitalized after a semicolon inside a citation sentence (`; See also`), and an ellipsis in the document's own quotation that isn't three spaced periods (`...` or `…` for `. . .`).
-- **Record-cite forms** (to check, once per document with a count): several paragraphs under one `¶` (`¶ 8, 12` for `¶¶ 8, 12`), and Id. used for record cites, which the Indigo Book advises against (with `Id. at 79` for `Id. ¶ 79` where it's used anyway). A court's own rules on citing the record govern over these.
+- **Record-cite forms** (to check, once per document with a count): several paragraphs under one `¶` (`¶ 8, 12` for `¶¶ 8, 12`), and Id. used for record cites, which the Indigo Book advises against (with `Id. at 79` for `Id. ¶ 79` where it's used anyway). An Id. counts as repeating a record cite only when nothing else comes between: no authority the script didn't read, and no footnote's number. A court's own rules on citing the record govern over these.
 - **Short forms across the whole document,** which no model holds well in a long brief:
   - an Id. after a string citation;
   - an Id. whose pinpoint doesn't fit what it refers to (a page after a statute);
-  - a short form before the case's full citation, or for a case never cited in full;
+  - a short form before the case's full citation, or for a case never cited in full (a full citation with a placeholder volume, `— So. 3d —, 2023 WL 1234567`, counts);
   - a section cited without its code (`See § 48.031(2).`) before the code's first full citation, and a constitution cited without its name (`Art. V, § 6(b)`), which has no short form;
   - a short form whose volume differs from the full citation's;
   - a short form missing `at` (`Fenelon, 594 So. 2d 294.` after the full citation);
   - a pinpoint before the case's first page;
   - supra used for a case;
-  - a full citation repeated on the same page where a short form would do.
+  - a full citation repeated on the same page where a short form would do (one in a section heading doesn't count).
 - **Case-name typeface** (9.800(q)) in Word and Markdown files, where italics survive.
 
 ### Reviews the other side's filing
@@ -99,7 +99,8 @@ The judgment stays with the agent and the arithmetic with the script. The report
   - citations inside quotation marks or block quotes (they're the quoted writer's form; the report counts them, with their pages);
   - an Id. whose antecedent it can't see: after something that looks like an authority it didn't read (a record cite, a report or web page, a filing, an unrecognized citation), a quotation, or a page split. These are counted in the report;
   - a quotation's source across such an authority: the quotation is listed with no citation rather than tied to the wrong one;
-  - pinpoint checks on a citation whose page may come after what it read (`..., 2020 WL 1234567 (M.D. Fla. Mar. 1, 2020), at 19`).
+  - pinpoint checks on a citation whose page may come after what it read (`..., 2020 WL 1234567 (M.D. Fla. Mar. 1, 2020), at 19`);
+  - "never cited in full" for a short form whose volume and reporter turn up in a passage it didn't read (a table's cells, for instance), where the full citation may be.
 - **Record citations are checked only for form.** `(R. 45)` and appendix cites follow each court's own practice, so the script reports only the paragraph-sign and Id. forms above, as things to check, and never whether a record cite points where it should.
 - **The Bluebook system is checked through the Indigo Book,** which tracks an earlier Bluebook edition. The 22nd edition's changes are listed for the agent, but the script's short-form checks follow the Indigo Book's rules. The skill quotes no Bluebook text.
 - **It doesn't edit your file.** It reports locations and fixes; you or your agent make the changes.

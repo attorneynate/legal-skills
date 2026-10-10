@@ -719,6 +719,12 @@ TITLE_WORDS = {"of", "the", "and", "for", "in", "on", "to", "a", "an", "at", "by
 # and numbers ("Able, ID #12345"), nor a heading with a date ("The May 1, 2019 Meeting").
 CITATION_MARK = re.compile(r"[§¶]|\((?![a-z]{0,2}\))|\bat \*?\d|\b" + YEAR + r"-\d|\bv\. |\bLaws of\b")
 HEADING_MARK = re.compile(r"(?:[IVX]+|[A-Z]|\d{1,2})\.\s")
+
+
+def mostly_capitals(words):
+    """Are the words a heading in capitals ("THE COURT ERRED IN APPLYING SECTION 1.01(2)")?"""
+    caps = [w for w in words if len(w.rstrip(".")) >= 3 and w.isupper()]
+    return len(caps) >= 4 and len(caps) * 5 >= len(words) * 3
 CLAUSE_REACH = 400                # a citation clause longer than this is the writer's prose
 OWN_REACH = 3000                  # how far a filing's caption may run, if no citation comes first
 
@@ -885,8 +891,7 @@ class Unread:
         words = re.findall(r"[A-Za-z][A-Za-z'.\-]*", t)
         if len(words) < 2:
             return False
-        caps = [w for w in words if len(w.rstrip(".")) >= 3 and w.isupper()]
-        if len(caps) >= 4 and len(caps) * 5 >= len(words) * 3:
+        if mostly_capitals(words):
             return False
         return all(w[0].isupper() or w.endswith(".") or w.lower().rstrip(".") in TITLE_WORDS for w in words)
 

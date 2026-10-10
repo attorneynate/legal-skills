@@ -81,14 +81,14 @@
      "examples": {"match": ["No. 2D2014-2438, 2014 WL 3418358 (Fla. 4th DCA June 12, 2014)"], "no_match": ["No. 2D2014-2438, 2014 WL 3418358 (Fla. 2d DCA June 12, 2014)"]}},
 
     {"id": "b-dca-ordinal", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\b([23])(?:nd|rd) DCA\\b", "fix": "\\1d DCA",
+     "pattern": "\\b([23])(?:nd|rd) DCA(?= (?:[A-Z][a-z]{2,8}\\.? \\d{1,2}, )?(?:1[89]|20)\\d\\d\\))", "fix": "\\1d DCA",
      "message": "The rule writes 2d and 3d, not 2nd and 3rd.",
-     "examples": {"match": ["(Fla. 3rd DCA 1988)", "(Fla. 2nd DCA 1988)"], "no_match": ["(Fla. 3d DCA 1988)", "(Fla. 2d DCA 1988)"]}},
+     "examples": {"match": ["(Fla. 3rd DCA 1988)", "(Fla. 2nd DCA 1988)", "(Fla. 2nd DCA July 1, 2022)", "(2nd DCA 1988)"], "no_match": ["(Fla. 3d DCA 1988)", "(Fla. 2d DCA 1988)", "the 2nd DCA's decision rests on", "as held by the 2nd DCA in its opinion", "B. The 2nd DCA's Recent Decision", "(the 3rd DCA 1988 decision)", "the Second District (2nd DCA) held"]}},
 
     {"id": "b-dca-periods", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
-     "pattern": "\\b(\\d(?:st|d|nd|rd|th)) D\\. ?C\\. ?A\\.", "fix": "\\1 DCA",
+     "pattern": "\\b(\\d(?:st|d|nd|rd|th)) D\\. ?C\\. ?A\\.(?= (?:[A-Z][a-z]{2,8}\\.? \\d{1,2}, )?(?:1[89]|20)\\d\\d\\))", "fix": "\\1 DCA",
      "message": "The rule writes DCA without periods.",
-     "examples": {"match": ["(Fla. 3d D.C.A. 1988)", "(Fla. 1st D. C. A. 1990)"], "no_match": ["(Fla. 3d DCA 1988)"]}},
+     "examples": {"match": ["(Fla. 3d D.C.A. 1988)", "(Fla. 1st D. C. A. 1990)", "(Fla. 4th D.C.A. Mar. 6, 2002)"], "no_match": ["(Fla. 3d DCA 1988)", "the 3d D.C.A. held in 1988 that", "as the 1st D. C. A. explained"]}},
 
     {"id": "b-dca-no-fla", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
      "pattern": "\\(((?:1st|2d|3d|4th|5th|6th) DCA)", "fix": "(Fla. \\1",
@@ -106,9 +106,9 @@
      "examples": {"match": ["Doe v. Roe, 300 So. 3d 100, 102 (Fla. 2d 2020)", "(Fla. 4th Mar. 6, 2002)"], "no_match": ["(Fla. 2d DCA 2020)", "(Fla. 2020)", "811 So. 2d 822 (Fla. 1st DCA 2002)"]}},
 
     {"id": "b-dca-glued", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern", "summarize": true,
-     "pattern": "\\b(1st|2d|2nd|3d|3rd|4th|5th|6th)(DCA)\\b", "fix": "\\1 \\2",
+     "pattern": "\\b(1st|2d|2nd|3d|3rd|4th|5th|6th)(DCA)(?= (?:[A-Z][a-z]{2,8}\\.? \\d{1,2}, )?(?:1[89]|20)\\d\\d\\))", "fix": "\\1 \\2",
      "message": "A space separates the district from DCA: (Fla. 4th DCA 2010).",
-     "examples": {"match": ["(Fla. 4thDCA 2010)", "60 So. 3d 100 (Fla. 2dDCA 2010)"], "no_match": ["(Fla. 4th DCA 2010)"]}},
+     "examples": {"match": ["(Fla. 4thDCA 2010)", "60 So. 3d 100 (Fla. 2dDCA 2010)", "(Fla. 4thDCA June 12, 2014)"], "no_match": ["(Fla. 4th DCA 2010)", "the 4thDCA's ruling", "B. The 2dDCA Erred"]}},
 
     {"id": "b-west-district", "authority": "9.800(b)(1)", "severity": "error", "kind": "logic", "logic": "west_dca",
      "message": "Name the district court as the rule does: (Fla. 4th DCA 2012), not Westlaw's (Fla. App. 4th Dist. 2012) or (Fla.App. 4 Dist. 2012).",
@@ -120,8 +120,8 @@
      "examples": {"match": ["under Florida Statute Section 48.031, service was", "as Florida Statute § 48.031(1) provides", "as Florida Statute§ 48.031(1) provides"], "no_match": ["section 48.031, Florida Statutes", "the Florida Statutes provide"]}},
 
     {"id": "court-unreadable", "authority": "9.800(b)(1)", "severity": "check", "kind": "logic", "logic": "court_unreadable",
-     "message": "The district in the parenthetical isn't one Rule 9.800 names: a typo, or an OCR misreading ('Ist' for '1st', 'Sth' for '5th').",
-     "examples": {"match": ["Parker v. State, 362 So. 2d 1033 (Fla. Ist DCA 1978)."], "no_match": ["Parker v. State, 362 So. 2d 1033 (Fla. 1st DCA 1978)."]}},
+     "message": "The district in the parenthetical isn't one Rule 9.800 names, or isn't where the rule puts it: a typo, or an OCR misreading ('Ist' for '1st', 'Sth' for '5th').",
+     "examples": {"match": ["Parker v. State, 362 So. 2d 1033 (Fla. Ist DCA 1978).", "Doe v. Roe, 300 So. 3d 100 (Fla. DCA 2020).", "Doe v. Roe, 300 So. 3d 100 (Fla. DCA 3rd 2020)."], "no_match": ["Parker v. State, 362 So. 2d 1033 (Fla. 1st DCA 1978).", "Doe v. Roe, 300 So. 3d 100 (Fla. 3d DCA 2020)."]}},
 
     {"id": "b-bluebook-court", "authority": "9.800(b)(1)", "severity": "error", "kind": "pattern",
      "pattern": "\\(Fla\\. ?(?:Dist\\. ?Ct\\. ?)?App\\. (\\d{4})\\)", "fix": null,
