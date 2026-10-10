@@ -718,6 +718,39 @@ TITLE_WORDS = {"of", "the", "and", "for", "in", "on", "to", "a", "an", "at", "by
 # parenthetical (not a plural's "(s)"), a session law's year, "v.", or "Laws of". Not a list of names
 # and numbers ("Able, ID #12345"), nor a heading with a date ("The May 1, 2019 Meeting").
 CITATION_MARK = re.compile(r"[§¶]|\((?![a-z]{0,2}\))|\bat \*?\d|\b" + YEAR + r"-\d|\bv\. |\bLaws of\b")
+# A citation clause that is only an abbreviation and a page, with no other mark: "App'x 7", "SC R., 12",
+# "ROR:41", "TFBEx.9", "IB. P. 30", "TR. P. 5, Lines 1 - 4". Each word before the page is an abbreviation
+# (a period, an apostrophe, or capitals), so a word and a number ("Count 3", "Chapter 7") or a name isn't one;
+# and a number after '#' is an identification number, not a page ("Able Baker, ID #12345").
+ABBREV_PAGE = re.compile(
+    r"(?P<abbr>(?:[A-Z][A-Za-z']{0,7}(?:\.|'[a-z])?[ ,]{0,2}){1,3}?)(?::\s?|\.|(?<=[A-Za-z.,']) )"
+    r"(?:Vol\.\s?[\dIVXL]+,?\s)?(?:at |p\. ?|pp\. ?)?\d+(?:\s?[-–:]\s?\d+)*(?:,\s?\d+(?:\s?[-–]\s?\d+)*)*"
+    r"(?:,? (?:Lines?|Ln\.|ll?\.|In\.?) \d+(?:\s?[-–]\s?\d+)?)?(?: nn?\. ?\d+)?[\s.;)\]]*")
+# The record's own abbreviations: a clause ABBREV_PAGE reads with one of these is a record cite.
+# A party's brief in the case is cited like the record ("IB 12", "Br.62-64"), as the record sign takes it.
+RECORD_WORDS = {"R", "T", "TR", "SR", "PCR", "ROA", "ROR", "APP", "APPX", "A", "EX", "SA", "IB", "AB", "RB", "BR", "DOC",
+                "DOCS", "ECF", "DE", "DAR", "TAB", "TFBEX", "TFB", "SC", "SUPP", "VOL", "P"}
+
+
+def abbrev_page(text):
+    """'record', 'clause', or None: is text a citation clause that is only an abbreviation and a page
+    (ABBREV_PAGE), and does it lead with one of the record's abbreviations (RECORD_WORDS)?"""
+    m = ABBREV_PAGE.fullmatch(text)
+    if not m:
+        return None
+    abbr = m.group("abbr")
+    words = [t for t in re.split(r"[\s,]+", abbr) if t]
+    glued = abbr[-1:].isalpha() and text[m.end("abbr"):m.end("abbr") + 1] in (".", ":")   # "TFBEx.9", "ROR:41"
+
+    def abbreviation(w):
+        # a period, an apostrophe inside it ("App'x", not "FAU's"), or a few capitals ("SC", "ROR"; not a
+        # heading's "PARTIES" or "ARGUMENT")
+        return (w.endswith(".") or ("'" in w.strip("'") and not re.search(r"'s$", w))
+                or (w.isupper() and len(w) <= 4 and (len(w) >= 2 or len(words) > 1 or glued)))
+    if not words or not all(abbreviation(w) or (w is words[-1] and glued) for w in words):
+        return None
+    lead = re.sub(r"[^A-Za-z]", "", words[0]).upper()     # "SC R., 12", not "Fla. R. Crim. 1"
+    return "record" if lead in RECORD_WORDS else "clause"
 HEADING_MARK = re.compile(r"(?:[IVX]+|[A-Z]|\d{1,2})\.\s")
 
 
@@ -867,9 +900,13 @@ class Unread:
                 if m:
                     rest = text[m.end():b]
                     if re.match(r"[A-Z\d§¶\"“]|https?:|www\.", rest) and not CROSS_REFERENCE.match(rest):
-                        out.append(Sign(a, b, "clause", False))
+                        out.append(Sign(a, b, abbrev_page(rest) or "clause", False))
                 elif self._marked(a, b) and self._verbless(a, b):
-                    out.append(Sign(a, b, "clause", False))
+                    out.append(Sign(a, b, "record" if abbrev_page(text[a:b]) == "record" else "clause", False))
+                else:
+                    kind = abbrev_page(text[a:b])          # "App'x 7", "SC R., 12": only an abbreviation and a page
+                    if kind:
+                        out.append(Sign(a, b, kind, False))
         return out
 
     def _verbless(self, s, e):

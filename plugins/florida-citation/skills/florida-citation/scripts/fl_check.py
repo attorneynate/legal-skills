@@ -226,11 +226,35 @@ def read_pdf(path):
         r = _pdftotext(exe, path, layout=True, nodiag=nodiag)
         if r.returncode == 0:
             layout = decode(r.stdout).replace("\r\n", "\n").replace("\r", "\n")
+            text = line_end_hyphens(text, layout)
             blocks = layout_blocks(text, layout)
             feet = layout_footnotes(text, layout)
     except (subprocess.TimeoutExpired, OSError):
         pass
     return Source(text, str(path), "pdf", blocks=blocks, footnote_starts=feet)
+
+
+# A hyphen at a line's end between digits, as -layout keeps it: "Rule 4-" / "1.5(b)", "466, 476-" / "77". The
+# word before it is kept as context. Poppler sets a blank line between a double-spaced page's lines, and a
+# footnote's superscript number on a line of its own far to the right ("2011-" / "8" / "12"), which isn't the
+# number's rest: that starts near the margin.
+LINE_END_HYPHEN = re.compile(r"(\S+)[ \t]+(\S*\d)-[ \t]*\n(?:[ \t]*\n)?[ \t]{0,24}(\d[^\s\-]*)")
+
+
+def line_end_hyphens(text, layout):
+    """Put back the hyphens pdftotext's reading order drops at a line's end between digits: it takes them for
+    a word's soft hyphen, so "Rule 4-" / "1.5" reads "Rule 41.5" and a range "476-" / "77" reads "47677". No
+    word processor breaks a number with a soft hyphen, so one between digits at a line's end is the writer's.
+    Each is found by the word before it, the digits, and the digits after; only where the reading text has
+    them joined with nothing between."""
+    keys = {}
+    for m in LINE_END_HYPHEN.finditer(layout):
+        k = (m.group(1), m.group(2), m.group(3))
+        keys[k] = keys.get(k, 0) + 1
+    for (word, left, right), n in keys.items():
+        rx = re.compile(r"(?<!\S)(" + re.escape(word) + r"\s+" + re.escape(left) + r")(" + re.escape(right) + r")(?![\w\-])")
+        text = rx.sub(lambda m: m.group(1) + "-" + m.group(2), text, count=n)
+    return text
 
 
 LAYOUT_MIN_CHARS = 30            # a line with this many non-space characters helps set the page's margins
@@ -328,9 +352,11 @@ LINE_NUMBERED = 0.3              # a page with this share of its lines opening w
 def footnote_marker(n, text):
     """Does footnote number n appear in text as a marker: glued to a word or punctuation
     ("ordinances.2 See"), or one space after a period or a closing mark, where Poppler sets a
-    superscript ("Rule 1.530. 6 See", "relief.” 4 The")? A number after a word or a comma and a space
-    is a count or a pinpoint ("count 2 is", "at 10, 11")."""
-    return bool(re.search(r"(?:[A-Za-z.,;:)\]\"'”’]|[.;)\]\"'”’] )" + n + r"(?=\s|$)", text))
+    superscript ("Rule 1.530. 6 See", "relief.” 4 The"), or glued before a dash, where the marker goes
+    ("common law11--and", "law11—and")? A number after a word or a comma and a space is a count or a
+    pinpoint ("count 2 is", "at 10, 11")."""
+    return bool(re.search(r"(?:[A-Za-z.,;:)\]\"'”’]|[.;)\]\"'”’] )" + n + r"(?=\s|$)"
+                          r"|[A-Za-z.,;:)\]\"'”’]" + n + r"(?=--|[—–])", text))
 
 
 def footnote_line(lines, k, expected=None, at_margin=False):
@@ -3916,6 +3942,32 @@ def _unclosed_quotes(norm, marks):
 PAREN_OPEN_REACH = 600          # how far back a '(' still open at a quotation or citation is looked for
 
 
+def _citation_sentence_after(doc, sents, usable, starts, pos):
+    """The citation sentence right after the sentence holding offset pos, which by convention gives a
+    quotation in that sentence its source: a recognized citation opening the next sentence with no signal
+    ("Able, 1 So. 3d at 5.", "Id. at 5."); "unread" when what opens it is something that looks like an
+    authority the script didn't read (fl_sentence.Unread: "Able,1 So. 3d at 5", "(R. 12)"); else None."""
+    norm = doc.norm
+    k = sents.index(pos)
+    if k >= len(sents.bounds):
+        return None
+    s = sents.bounds[k]
+    while s < len(norm) and norm[s].isspace():
+        s += 1
+    j = bisect.bisect_left(starts, s)
+    if j < len(usable) and usable[j]["start"] == s and doc.stream(s) == doc.stream(pos):
+        return usable[j]
+    # A date parenthetical there belongs to the citation before it ('"... exist." (6th ed. 1990)'), not to one of
+    # its own.
+    if any(g.start - s <= 2 and g.name not in ("case name", "hereinafter", "date") for g in doc.unread.unread(s, s + 3)):
+        return "unread"
+    return None
+
+
+UNREAD_SOURCE = ("followed by a citation the script can't read, which is probably its source; "
+                 "find the source by hand")
+
+
 def tie_quotations(doc, cites):
     """Each quotation of MIN_QUOTE_WORDS or more, with the citation it's tied to (or none)."""
     norm, sents = doc.norm, doc.sentences
@@ -3957,7 +4009,20 @@ def tie_quotations(doc, cites):
             if k < len(usable) and doc.stream(usable[k]["start"]) == stream:
                 c, gap = usable[k], norm[close:usable[k]["start"]]
                 if QUOTE_THEN_CITE.fullmatch(gap):
-                    q["citation"], q["attributed_by"] = c["index"], "follows"
+                    # A citation that completes the quoting sentence ('This "test comes from" Able, 1 U.S. 1 (1990).')
+                    # is its object; a citation sentence after it is the quotation's source. Not a citation clause
+                    # set off in the sentence, after the quotation's own comma ('"... practice," Id. at 837, and')
+                    # or before more of it, which is the quotation's source.
+                    integral = (not block and sents.same_sentence(close - 1, c["start"])
+                                and norm[e - 1:e].isalnum() and not re.search(r"[,;]", gap)
+                                and sents.ends_at(c["end"]))
+                    after = _citation_sentence_after(doc, sents, usable, starts, c["start"]) if integral else None
+                    if after == "unread":
+                        q["note"] = UNREAD_SOURCE
+                    elif after is not None:
+                        q["citation"], q["attributed_by"] = after["index"], "citation sentence"
+                    else:
+                        q["citation"], q["attributed_by"] = c["index"], "follows"
                 elif (not block and not doc.unread.unread(close, c["start"]) and re.match(r"[,;:]?\s+[a-z]", gap)
                       and sents.same_sentence(close - 1, close)):
                     # the quotation's own sentence goes on, then ends, and the citation opens the next:
@@ -4004,7 +4069,15 @@ def tie_quotations(doc, cites):
                 or (nxt is not None and sents.same_sentence(q["_end"], nxt["start"]))
                 or any(c["end"] <= p["_start"] < o and p["citation"] != c["index"] for p in out)):
             continue
-        q["citation"], q["attributed_by"] = c["index"], "textual citation"
+        # A citation sentence after the quoting sentence is the quotation's source, before the case the
+        # sentence names ('In Able, 1 So. 3d 1 (Fla. 2010), the court read "a written report." Id. at 3.').
+        after = _citation_sentence_after(doc, sents, usable, starts, q["_end"] - 1)
+        if after == "unread":
+            q["note"] = UNREAD_SOURCE
+        elif after is not None:
+            q["citation"], q["attributed_by"] = after["index"], "citation sentence"
+        else:
+            q["citation"], q["attributed_by"] = c["index"], "textual citation"
     for q in out:
         q.pop("_start"), q.pop("_end")
         if q["citation"] is None:
