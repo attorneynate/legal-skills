@@ -16,7 +16,8 @@ Each case runs one federal_law.py command and makes two kinds of check:
            on both tries. The Office of the Federal Register blocks some networks,
            including some cloud servers, so this says nothing about the script;
            run the test from another network to check those cases.
-  DOWN     uscode.house.gov answered with House.gov's maintenance page on both
+  DOWN     uscode.house.gov answered with House.gov's maintenance page, or with a
+           missing page while its notice says it's in a temporary format, on both
            tries. That's the site, not the script; rerun those checks once it's back.
 
 Exit status is 1 if anything FAILED, else 0. Under GitHub Actions, BLOCKED, DOWN,
@@ -211,7 +212,7 @@ def attempt(case):
         return ["timed out after 300s"], [], None
     out = proc.stdout + proc.stderr
     blocked = re.search(r"ACCESS BLOCKED: (\S+) refused", out)
-    down = re.search(r"([\w.]+) is down for maintenance", out)
+    down = re.search(r"([\w.]+) is (down for maintenance|in a temporary format)", out)
     failures, changes = [], []
     if proc.returncode != 0 and name not in BAD_INPUT:
         failures.append(f"exit status {proc.returncode}: {out.strip()[-300:]}")
@@ -222,7 +223,7 @@ def attempt(case):
     if blocked:
         outage = ("BLOCKED", f"{blocked[1]} refused this network (HTTP 403)")
     elif down:
-        outage = ("DOWN", f"{down[1]} is down for maintenance")
+        outage = ("DOWN", f"{down[1]} is {down[2]}")
     else:
         outage = None
     return failures, changes, outage
@@ -232,7 +233,7 @@ def run(case):
     """One case, rerun once if it fails: the sources are live government sites, and a
     one-off outage shouldn't fail the suite. A pass on the rerun is reported as FLAKY;
     a site refusing this network on both tries, as BLOCKED; a site down for
-    maintenance on both tries, as DOWN."""
+    maintenance, or missing pages in a temporary format, on both tries, as DOWN."""
     failures, changes, outage = attempt(case)
     first = None
     if failures:

@@ -177,13 +177,21 @@ def fetch_page(url, allow_missing=False):
     else:
         text = content.decode("utf-8", errors="replace")
     host = urllib.parse.urlsplit(final).netloc
+    meanwhile = ("This is the site, not the citation; try again later. Until then, `usc` still "
+                 "pulls GPO's edition from GovInfo, but `currency`, `usc --as-of`, and the "
+                 "positive-law line need uscode.house.gov.")
     # During House.gov maintenance, every uscode.house.gov URL answers HTTP 200 with
     # the same "Under Maintenance" page, so the status code alone looks like success.
     if host.endswith("house.gov") and "Site is currently under maintenance" in text:
         sys.exit(f"UNAVAILABLE: {host} is down for maintenance (every page returns House.gov's "
-                 "maintenance notice). This is the site, not the citation; try again later. "
-                 "Until then, `usc` still pulls GPO's edition from GovInfo, but `currency`, "
-                 "`usc --as-of`, and the positive-law line need uscode.house.gov.")
+                 f"maintenance notice). {meanwhile}")
+    # In its "temporary format" (October 2026), the site's view, browse, and download
+    # pages answer HTTP 200 with a "Page Not Found" page under the site's notice. Only
+    # both together count, so the pages work again as soon as the site restores them.
+    if (host.endswith("house.gov") and "operating in a temporary format" in text
+            and "<title>Page Not Found" in text):
+        sys.exit(f"UNAVAILABLE: {host} is in a temporary format (its notice says some features "
+                 f"are temporarily unavailable), and the page this needs is gone. {meanwhile}")
     return final, text
 
 
@@ -543,7 +551,7 @@ def positive_law_note(title):
         enacted = positive_law_titles().get(str(title))
     except SystemExit as e:
         enacted = None
-        down = re.search(r"[\w.]+ is down for maintenance", str(e.code))
+        down = re.search(r"[\w.]+ is (?:down for maintenance|in a temporary format)", str(e.code))
     if enacted is None:
         return (f"Title {title}: couldn't confirm whether it has been enacted as positive law"
                 + (f" ({down.group(0)})." if down else "."))

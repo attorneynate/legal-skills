@@ -1,5 +1,9 @@
 # Changelog
 
+## federal-law 1.0.6 (2026-10-12)
+
+Says clearly when uscode.house.gov is running in its temporary format without the pages the skill reads (UNAVAILABLE, not a missing-citation error); the self-test reports those checks as DOWN, not FAIL.
+
 ## florida-citation 1.3.4 (2026-10-10)
 
 Fewer false flags and better-named findings, from a third precision batch of 14 filings run on 1.3.3. Footnotes numbered with a slash (`7/The court ...`) are read as footnotes, and a footnote that runs over to the next page is found there above the next one, so an Id. isn't linked to a footnote's case. A quotation that ends a page takes its citation from the top of the next page, past the page's footnotes. A brief or petition cited on Westlaw (`Reply Brief of Able in Baker, 2012 WL 1 (Fla., filed June 1, 2012)`) is read as a filing from another case: no docket number is asked for, and it isn't taken for a case's short form. A block quotation whose lead-in gives its source and page (`As stated in Able, 1 So. 3d 1, 5 (Fla. 2013):`) takes that source, not a `See also` citation after the block. A record document's name in prose (`the Declaration of Condominium`) is no longer read as a record cite; with a pinpoint (`Declaration ¶ 4`, `Section 2.2 of the Declaration`) it still is. A table of authorities whose entries hang, the case name on one line and the citation indented below, isn't reported as missing the name's comma. A record cite whose page reads as a year (`(T. 1975)`) is counted with the record cites. And several findings now name the right problem: a circuit court written without `Ct.` (`(Fla. 8th Cir. 2016)`), `U.S` or `US.` for `U.S.`, a period after `DCA`, the Florida Public Employee Reporter's name spelled out, a note on a case's first page (`410 n.12`) read as its pinpoint, the amendment fix taking a list (`amend. IV, XIV`), `f-name-first`'s fix taking spaced subsections, and a statute's year after a stray comma.
